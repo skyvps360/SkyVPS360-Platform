@@ -3,7 +3,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = await res.text();
-    
+
     try {
       // Try to parse as JSON to get a structured error
       const json = JSON.parse(text);
@@ -15,11 +15,13 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// Combined and improved apiRequest function
 export async function apiRequest(
   methodOrUrl: string,
   urlOrData?: string | unknown,
   data?: unknown | undefined,
-): Promise<Response> {
+  options?: RequestInit
+): Promise<any> {
   // Support both (method, url, data) and (url, method, data) formats
   let method: string;
   let url: string;
@@ -37,15 +39,30 @@ export async function apiRequest(
     requestData = data;
   }
 
-  const res = await fetch(url, {
+  // Add API_URL prefix if needed
+  if (!url.startsWith('http')) {
+    url = `${import.meta.env.VITE_API_URL || ''}${url}`;
+  }
+
+  const response = await fetch(url, {
     method,
-    headers: requestData ? { "Content-Type": "application/json" } : {},
+    headers: {
+      ...(requestData ? { "Content-Type": "application/json" } : {}),
+    },
     body: requestData ? JSON.stringify(requestData) : undefined,
-    credentials: "include",
+    credentials: "include", // Always include cookies with requests
+    ...options
   });
 
-  await throwIfResNotOk(res);
-  return res;
+  await throwIfResNotOk(response);
+  
+  // Handle empty responses or non-JSON content
+  const contentType = response.headers.get('content-type');
+  if (response.status === 204 || !contentType || !contentType.includes('application/json')) {
+    return null;
+  }
+  
+  return response.json();
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -53,46 +70,52 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    try {
-      // Log the query being attempted to help with debugging
-      console.log(`Fetching data for: ${queryKey[0]}`);
-      
-      const res = await fetch(queryKey[0] as string, {
-        credentials: "include",
-      });
-
-      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-        console.warn(`Authentication required for: ${queryKey[0]}`);
-        return null;
-      }
-
-      // Check for 204 No Content response (valid but empty)
-      if (res.status === 204) {
-        return null;
-      }
-
-      // Handle errors
-      await throwIfResNotOk(res);
-      
-      // Parse JSON response
+    async ({ queryKey }) => {
       try {
-        const data = await res.json();
-        return data;
-      } catch (parseError) {
-        console.error(`Failed to parse JSON for ${queryKey[0]}:`, parseError);
-        throw new Error(`Invalid JSON response from the server: ${parseError}`);
+        // Log the query being attempted to help with debugging
+        console.log(`Fetching data for: ${queryKey[0]}`);
+
+        const res = await fetch(queryKey[0] as string, {
+          credentials: "include",
+        });
+
+        if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+          console.warn(`Authentication required for: ${queryKey[0]}`);
+          return null;
+        }
+
+        // Check for 204 No Content response (valid but empty)
+        if (res.status === 204) {
+          return null;
+        }
+
+        // Handle errors
+        await throwIfResNotOk(res);
+
+        // Parse JSON response
+        try {
+          const data = await res.json();
+          return data;
+        } catch (parseError) {
+          console.error(`Failed to parse JSON for ${queryKey[0]}:`, parseError);
+          throw new Error(`Invalid JSON response from the server: ${parseError}`);
+        }
+      } catch (error) {
+        console.error(`Error fetching ${queryKey[0]}:`, error);
+        throw error;
       }
-    } catch (error) {
-      console.error(`Error fetching ${queryKey[0]}:`, error);
-      throw error;
-    }
-  };
+    };
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
+      queryFn: async ({ queryKey }) => {
+        if (typeof queryKey[0] === 'string' && queryKey[0].startsWith('/api')) {
+          console.log('Fetching data for:', queryKey[0]);
+          return apiRequest('GET', queryKey[0] as string);
+        }
+        return null;
+      },
       refetchInterval: false,
       refetchOnWindowFocus: true,
       staleTime: 30000, // 30 seconds - more responsive UI

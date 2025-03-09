@@ -55,16 +55,19 @@ export async function comparePasswords(supplied: string, stored: string) {
   }
 }
 
-export function setupAuth(app: Express) {
+export function setupAuth(app: Express, cookieOptions = {}) {
   const sessionSettings: session.SessionOptions = {
-    secret: "development-secret-key",
+    secret: process.env.SESSION_SECRET || "your-secret-key",
     resave: false,
     saveUninitialized: false,
     store: storage.sessionStore,
     cookie: {
+      secure: process.env.NODE_ENV === 'production', // Secure in production
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: "lax"
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      sameSite: "lax",
+      ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
+      ...cookieOptions
     }
   };
 

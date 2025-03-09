@@ -60,7 +60,16 @@ export default defineConfig({
           }
         }
       }
-    }
+    },
+    // Use a more compatible build target for wider browser support
+    target: ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
+    // Minimize bundle size
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: process.env.NODE_ENV === 'production',
+      },
+    },
   },
   // Optimize dependency processing
   optimizeDeps: {
@@ -76,7 +85,8 @@ export default defineConfig({
   // Ensure consistent environment variables
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
-    'import.meta.env.BASE_URL': JSON.stringify('/')
+    'import.meta.env.BASE_URL': JSON.stringify('/'),
+    'import.meta.env.VITE_DOMAIN': JSON.stringify(process.env.DOMAIN || 'skyvps360.xyz')
   },
   server: {
     hmr: {

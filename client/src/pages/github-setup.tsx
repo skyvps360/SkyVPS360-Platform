@@ -37,7 +37,9 @@ export default function GitHubSetupPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
+    <div className="container mx-auto py-8 px-4">
+      <h1 className="text-3xl font-bold mb-6">GitHub Setup</h1>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">GitHub Integration</h1>
@@ -143,6 +145,18 @@ export default function GitHubSetupPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <div className="flex flex-wrap gap-4 mt-8">
+        <Button asChild>
+          <Link href="/github-guide">GitHub Integration Guide</Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/deployments">View Deployments</Link>
+        </Button>
+        <Button variant="secondary" asChild>
+          <Link href="/dashboard">Return to Dashboard</Link>
+        </Button>
+      </div>
     </div>
   );
 }

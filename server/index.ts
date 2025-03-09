@@ -71,6 +71,30 @@ app.use((req, res, next) => {
   next();
 });
 
+// Add this after the app initialization
+app.use((req, res, next) => {
+  // Domain handling for cookies
+  const allowedDomains = [
+    'skyvps360.xyz',
+    'www.skyvps360.xyz',
+    'localhost',
+    req.hostname // Allow current hostname for development
+  ];
+
+  // Set CORS headers to allow your domain
+  res.header('Access-Control-Allow-Origin',
+    allowedDomains.includes(req.hostname) ? `https://${req.hostname}` : 'https://skyvps360.xyz');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  // Trust proxy for secure cookies over HTTPS when behind load balancers
+  app.set('trust proxy', 1);
+
+  // Continue with request
+  next();
+});
+
 // Create default users and test data
 async function createTestData() {
   try {
@@ -213,7 +237,16 @@ const getRootPath = () => {
     await createTestData();
 
     // Set up authentication before routes
-    setupAuth(app);
+    setupAuth(app, {
+      cookie: {
+        secure: process.env.NODE_ENV === 'production', // Secure in production
+        httpOnly: true,
+        sameSite: 'lax', // Less restrictive for better compatibility
+        domain: process.env.NODE_ENV === 'production'
+          ? '.skyvps360.xyz'  // Note the dot prefix for subdomain support
+          : undefined,
+      }
+    });
 
     // Register admin routes before regular routes
     registerAdminRoutes(app);

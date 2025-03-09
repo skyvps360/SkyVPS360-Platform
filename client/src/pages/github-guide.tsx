@@ -21,7 +21,7 @@ export default function GitHubGuidePage() {
   const isConnected = !isError && repos.length > 0;
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-8 px-4">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold">GitHub Integration Guide</h1>
@@ -206,6 +206,18 @@ export default function GitHubGuidePage() {
             )}
           </Card>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-4 mt-8">
+        <Button asChild>
+          <Link href="/github-setup">GitHub Setup</Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/deployments">View Deployments</Link>
+        </Button>
+        <Button variant="secondary" asChild>
+          <Link href="/dashboard">Return to Dashboard</Link>
+        </Button>
       </div>
     </div>
   );

@@ -250,6 +250,9 @@ export default function Dashboard() {
             <Button variant="outline" asChild>
               <Link href="/support">Support</Link>
             </Button>
+            <Button variant="outline" asChild>
+              <Link href="/deployments">Deployments</Link>
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
@@ -565,23 +568,13 @@ export default function Dashboard() {
                 </DialogContent>
               </Dialog>
 
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <Github className="h-4 w-4 mr-2" />
-                    Deploy GitHub App
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Deploy from GitHub</DialogTitle>
-                    <DialogDescription>
-                      Deploy an application directly from your GitHub repository
-                    </DialogDescription>
-                  </DialogHeader>
-                  <GitHubDeployForm />
-                </DialogContent>
-              </Dialog>
+              {/* Replace the Dialog with a Link to /github-guide */}
+              <Button variant="outline" asChild>
+                <Link href="/github-guide">
+                  <Github className="h-4 w-4 mr-2" />
+                  Deploy GitHub App
+                </Link>
+              </Button>
             </div>
           </div>
           <div className="relative">

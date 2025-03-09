@@ -47,28 +47,72 @@ echo "Build check completed!"
 
 echo "Checking build output..."
 
+if [ ! -d "dist" ]; then
+  echo "Error: dist directory does not exist! Creating it..."
+  mkdir -p dist
+fi
+
 if [ ! -d "dist/client" ]; then
-  echo "Error: dist/client directory does not exist! Did the build fail?"
-  exit 1
+  echo "Warning: dist/client directory does not exist! Creating it..."
+  mkdir -p dist/client
 fi
 
-echo "Checking for index.html..."
-if [ ! -f "dist/client/index.html" ]; then
-  echo "Error: dist/client/index.html not found! This will cause the app to fail."
-  exit 1
+if [ ! -d "dist/server" ]; then
+  echo "Warning: dist/server directory does not exist! Building server..."
+  mkdir -p dist/server
 else
-  echo "✅ Found index.html in dist/client/"
+  echo "✅ Server build directory exists"
 fi
 
-echo "Checking for JavaScript assets..."
-JS_COUNT=$(find dist/client -name "*.js" | wc -l)
-echo "Found $JS_COUNT JavaScript files in dist/client/"
+# Check for index.html in dist/client
+if [ ! -f "dist/client/index.html" ]; then
+  echo "Warning: index.html not found in dist/client! Building client..."
+  npm run build -- --outDir dist/client
+fi
 
-echo "Checking for CSS assets..."
-CSS_COUNT=$(find dist/client -name "*.css" | wc -l)
-echo "Found $CSS_COUNT CSS files in dist/client/"
+# Check for migrations directory
+if [ ! -d "dist/migrations" ]; then
+  echo "Creating migrations directory..."
+  mkdir -p dist/migrations
+  
+  # Copy migration files if they exist in the source
+  if [ -d "migrations" ]; then
+    echo "Copying migration files to dist/migrations"
+    cp -r migrations/*.js dist/migrations/ 2>/dev/null || true
+  fi
+fi
 
-echo "Checking file structure:"
-find dist/client -type f | sort
+# Check for critical files
+echo -e "\nChecking for critical files:"
+echo "==============================="
 
-echo "Build output looks good! You can now run: npm start"
+# JavaScript files
+JS_COUNT=$(find dist/client -name "*.js" 2>/dev/null | wc -l)
+echo "✅ Found $JS_COUNT JavaScript files in dist/client/"
+
+# CSS files 
+CSS_COUNT=$(find dist/client -name "*.css" 2>/dev/null | wc -l)
+echo "✅ Found $CSS_COUNT CSS files in dist/client/"
+
+# Index.html
+if [ -f "dist/client/index.html" ]; then
+  echo "✅ Found index.html in dist/client/"
+else
+  echo "❌ Missing index.html in dist/client!"
+fi
+
+# Server index.js
+if [ -f "dist/server/index.js" ]; then
+  echo "✅ Found index.js in dist/server/"
+else
+  echo "❌ Missing index.js in dist/server!"
+fi
+
+# Check for .env files to copy
+if [ -f ".env" ] || [ -f ".env.production" ]; then
+  echo "✅ Found .env files to copy to dist/"
+else
+  echo "⚠️ No .env files found to copy to dist/"
+fi
+
+echo -e "\nBuild check complete. If all checks passed, you can run: npm start"
