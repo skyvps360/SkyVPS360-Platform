@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # Development app service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/skyvps360
+      - SESSION_SECRET=dev_session_secret
+      - PAYPAL_MODE=sandbox
+      - PAYPAL_CLIENT_ID=${PAYPAL_CLIENT_ID:-sandbox_id}
+      - PAYPAL_SECRET=${PAYPAL_SECRET:-sandbox_secret}
+      - DIGITAL_OCEAN_API_KEY=${DIGITAL_OCEAN_API_KEY:-dummy_api_key}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-dummy_github_id}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-dummy_github_secret}
+      - GITHUB_REDIRECT_URI=http://localhost:5000/api/github/callback
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - db
+    command: npm run dev
+    restart: unless-stopped
+
+  # Development database service
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=skyvps360
+    volumes:
+      - dev_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  dev_postgres_data:

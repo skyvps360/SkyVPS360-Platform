@@ -1,0 +1,22 @@
+# Development container
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install global packages
+RUN npm install -g tsx nodemon
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Expose development port
+EXPOSE 5000
+
+# Start development server
+CMD ["npm", "run", "dev"]

@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 212 72% 45%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 212 72% 45%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 212 72% 45%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 212 72% 45%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+  
+  /* Fix for currency display */
+  .text-red-600, .text-green-600 {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Print styles for documentation */
+@media print {
+  /* Hide navigation and unnecessary UI elements */
+  nav, header, footer, .sidebar, 
+  [role="tablist"], [role="tab"], 
+  input[type="search"],
+  .print-hidden {
+    display: none !important;
+  }
+  
+  /* Remove the print button */
+  button[onClick*="print"] {
+    display: none !important;
+  }
+  
+  /* Ensure proper color contrast for printing */
+  body {
+    color: black !important;
+    background: white !important;
+  }
+  
+  /* Full width for content */
+  .md\:col-span-3 {
+    display: none !important;
+  }
+  
+  .md\:col-span-9 {
+    width: 100% !important;
+    max-width: 100% !important;
+    grid-column: span 12 / span 12 !important;
+  }
+  
+  /* Remove card styling for cleaner print */
+  .card {
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  .card-content {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  /* Improve text rendering for print */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  
+  pre, code {
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+  }
+  
+  /* Ensure proper page breaks */
+  p, h2, h3 {
+    orphans: 3;
+    widows: 3;
+  }
+  
+  /* Ensure code blocks print properly with borders */
+  pre {
+    border: 1px solid #ddd !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
