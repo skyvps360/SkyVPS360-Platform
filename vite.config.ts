@@ -63,20 +63,14 @@ export default defineConfig({
     },
     // Use a more compatible build target for wider browser support
     target: ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
-    // Minimize bundle size
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: process.env.NODE_ENV === 'production',
-      },
-    },
+    // Change from terser to esbuild since terser is not installed
+    minify: 'esbuild',
   },
   // Optimize dependency processing
   optimizeDeps: {
     include: [
       'react',
       'react-dom',
-      //'react-router-dom', // Remove this as you use wouter instead
       'wouter',
       '@tanstack/react-query'
     ],

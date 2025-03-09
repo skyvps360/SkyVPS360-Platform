@@ -1051,17 +1051,21 @@ async function comparePasswords(supplied, stored) {
     return false;
   }
 }
-function setupAuth(app2) {
+function setupAuth(app2, cookieOptions = {}) {
   const sessionSettings = {
-    secret: "development-secret-key",
+    secret: process.env.SESSION_SECRET || "your-secret-key",
     resave: false,
     saveUninitialized: false,
     store: storage.sessionStore,
     cookie: {
+      secure: process.env.NODE_ENV === "production",
+      // Secure in production
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1e3,
-      // 24 hours
-      sameSite: "lax"
+      maxAge: 30 * 24 * 60 * 60 * 1e3,
+      // 30 days
+      sameSite: "lax",
+      ...process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN },
+      ...cookieOptions
     }
   };
   app2.set("trust proxy", 1);
@@ -6645,6 +6649,24 @@ app.use((req, res, next) => {
   });
   next();
 });
+app.use((req, res, next) => {
+  const allowedDomains = [
+    "skyvps360.xyz",
+    "www.skyvps360.xyz",
+    "localhost",
+    req.hostname
+    // Allow current hostname for development
+  ];
+  res.header(
+    "Access-Control-Allow-Origin",
+    allowedDomains.includes(req.hostname) ? `https://${req.hostname}` : "https://skyvps360.xyz"
+  );
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  app.set("trust proxy", 1);
+  next();
+});
 async function createTestData() {
   try {
     const admins = await db.select().from(users).where(eq12(users.isAdmin, true));
@@ -6749,7 +6771,16 @@ var importPath = (relativePath) => {
     }
     loadGitHubCredentials();
     await createTestData();
-    setupAuth(app);
+    setupAuth(app, {
+      cookie: {
+        secure: process.env.NODE_ENV === "production",
+        // Secure in production
+        httpOnly: true,
+        sameSite: "lax",
+        // Less restrictive for better compatibility
+        domain: process.env.NODE_ENV === "production" ? ".skyvps360.xyz" : void 0
+      }
+    });
     registerAdminRoutes(app);
     const server = await registerRoutes(app);
     app.use("/api/github", github_default);
