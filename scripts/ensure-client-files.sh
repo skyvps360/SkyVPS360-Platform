@@ -1,3 +1,18 @@
+#!/bin/bash
+
+# Ensure client files exist for development and production
+echo "Ensuring client files exist..."
+
+CLIENT_DIR="dist/client"
+ASSETS_DIR="$CLIENT_DIR/assets"
+
+# Make directories if they don't exist
+mkdir -p $ASSETS_DIR
+
+# Check if index.html exists
+if [ ! -f "$CLIENT_DIR/index.html" ]; then
+  echo "Creating fallback index.html..."
+  cat > "$CLIENT_DIR/index.html" << 'EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -42,3 +57,24 @@
   </script>
 </body>
 </html>
+EOF
+  echo "Fallback index.html created"
+fi
+
+# Create minimal CSS and JS files if they don't exist
+if [ ! -f "$ASSETS_DIR/main.css" ]; then
+  echo "Creating fallback CSS..."
+  cat > "$ASSETS_DIR/main.css" << 'EOF'
+body { font-family: system-ui, sans-serif; line-height: 1.5; }
+EOF
+fi
+
+if [ ! -f "$ASSETS_DIR/main.js" ]; then
+  echo "Creating fallback JS..."
+  cat > "$ASSETS_DIR/main.js" << 'EOF'
+console.log('Fallback script loaded');
+document.getElementById('root').setAttribute('id', 'app-loaded');
+EOF
+fi
+
+echo "Client files are ready"

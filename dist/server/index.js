@@ -7,9 +7,9 @@ var __export = (target, all) => {
 // server/index.ts
 import express12 from "express";
 import dotenv2 from "dotenv";
-import path4 from "path";
-import fs2 from "fs";
-import { fileURLToPath as fileURLToPath4 } from "url";
+import path5 from "path";
+import fs3 from "fs";
+import { fileURLToPath as fileURLToPath5 } from "url";
 
 // server/utils/static-handler.ts
 import fs from "fs";
@@ -93,11 +93,11 @@ var logger = {
   auth: (message) => {
     console.log(`${timestamp()} ${icons.auth} ${colors.cyan}[AUTH]${colors.reset} ${message}`);
   },
-  api: (message, method, path5, status, duration) => {
+  api: (message, method, path6, status, duration) => {
     const statusColor = status && status >= 400 ? colors.red : colors.green;
     const methodColor = method === "GET" ? colors.cyan : method === "POST" ? colors.green : method === "PUT" ? colors.yellow : method === "DELETE" ? colors.red : colors.blue;
     console.log(
-      `${timestamp()} ${icons.api} ${methodColor}${method}${colors.reset} ${path5} ${status ? `${statusColor}${status}${colors.reset}` : ""} ${duration ? `${colors.yellow}${duration}ms${colors.reset}` : ""}`
+      `${timestamp()} ${icons.api} ${methodColor}${method}${colors.reset} ${path6} ${status ? `${statusColor}${status}${colors.reset}` : ""} ${duration ? `${colors.yellow}${duration}ms${colors.reset}` : ""}`
     );
   }
 };
@@ -111,49 +111,200 @@ function setupStaticServing(app2) {
     logger.info("Not in production, skipping static file setup");
     return;
   }
+  logger.info(`Current working directory: ${process.cwd()}`);
+  logger.info(`__dirname: ${__dirname}`);
   const possibleClientPaths = [
     path.join(process.cwd(), "dist", "client"),
-    path.join(__dirname, "..", "..", "client"),
     path.join(__dirname, "..", "..", "dist", "client"),
-    path.join(__dirname, "../../..", "dist", "client")
+    path.join(__dirname, "..", "..", "..", "dist", "client"),
+    path.join(process.cwd(), "client")
   ];
-  let clientPath = null;
-  for (const testPath of possibleClientPaths) {
-    if (fs.existsSync(testPath)) {
-      clientPath = testPath;
-      logger.info(`Found client files at: ${clientPath}`);
-      break;
-    } else {
-      logger.debug(`Client path not found at: ${testPath}`);
+  possibleClientPaths.forEach((testPath, index) => {
+    const exists = fs.existsSync(testPath);
+    logger.info(`Checking path ${index + 1}: ${testPath} - ${exists ? "EXISTS" : "NOT FOUND"}`);
+  });
+  const clientPath = possibleClientPaths.find((p) => fs.existsSync(p)) || possibleClientPaths[0];
+  if (!fs.existsSync(clientPath)) {
+    try {
+      fs.mkdirSync(clientPath, { recursive: true });
+      logger.info(`Created client directory at: ${clientPath}`);
+    } catch (err) {
+      logger.error(`Failed to create client directory: ${err.message}`);
     }
-  }
-  if (!clientPath) {
-    logger.error("Could not find client build files! Static serving will not work.");
-    return;
-  }
-  const indexPath = path.join(clientPath, "index.html");
-  if (!fs.existsSync(indexPath)) {
-    logger.error(`Index.html not found at ${indexPath}`);
   } else {
-    logger.info(`Found index.html at ${indexPath}`);
+    try {
+      const files = fs.readdirSync(clientPath).slice(0, 5);
+      logger.info(`Found client directory at: ${clientPath}`);
+      logger.info(`Files in directory: ${files.join(", ")}`);
+    } catch (err) {
+      logger.error(`Error reading directory: ${err.message}`);
+    }
   }
-  app2.use(express.static(clientPath));
+  app2.use((req, res, next) => {
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' *;"
+    );
+    next();
+  });
+  app2.use((req, res, next) => {
+    if (req.path.endsWith("/") && req.path !== "/") {
+      const pathWithoutTrailingSlash = req.path.slice(0, -1);
+      return res.redirect(301, pathWithoutTrailingSlash);
+    }
+    next();
+  });
+  app2.use(express.static(clientPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".html")) {
+        res.setHeader("Cache-Control", "no-cache");
+      } else if (filePath.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
+        res.setHeader("Cache-Control", "public, max-age=86400");
+      }
+    }
+  }));
+  app2.get("/", (req, res) => {
+    logger.info("Root path requested, serving index.html");
+    const indexPath = path.join(clientPath, "index.html");
+    res.sendFile(indexPath);
+  });
   app2.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api")) {
+    if (req.path.startsWith("/api/") || req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
       return next();
     }
-    if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
-      return next();
-    }
-    logger.debug(`Serving index.html for route: ${req.path}`);
+    logger.info(`SPA route handler for: ${req.path}, serving index.html`);
+    const indexPath = path.join(clientPath, "index.html");
     res.sendFile(indexPath, (err) => {
       if (err) {
-        logger.error(`Error sending index.html for ${req.path}: ${err.message}`);
-        res.status(500).send("Server Error: Could not serve application");
+        logger.error(`Error sending index.html: ${err.message}`);
+        res.status(200).send(`
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>SkyVPS360 Platform</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <link rel="icon" href="data:,">
+            <style>
+              body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+              .content { text-align: center; }
+            </style>
+          </head>
+          <body>
+            <div class="content">
+              <h1>SkyVPS360 Platform</h1>
+              <p>Loading application...</p>
+              <script>
+                setTimeout(() => { window.location.href = '/auth'; }, 3000);
+              </script>
+            </div>
+          </body>
+          </html>
+        `);
       }
     });
   });
   logger.success("Static file serving configured successfully");
+}
+
+// server/routes/debug-routes.js
+import { Router } from "express";
+import fs2 from "fs";
+import path2 from "path";
+import { fileURLToPath as fileURLToPath2 } from "url";
+import os from "os";
+var __filename2 = fileURLToPath2(import.meta.url);
+var __dirname2 = path2.dirname(__filename2);
+var router = Router();
+router.get("/paths", (req, res) => {
+  const isProduction = process.env.NODE_ENV === "production";
+  const possiblePaths = [
+    path2.join(process.cwd(), "dist", "client"),
+    path2.join(__dirname2, "..", "..", "dist", "client"),
+    path2.join(__dirname2, "..", "..", "..", "dist", "client"),
+    path2.join(process.cwd(), "client"),
+    path2.join(process.cwd())
+  ];
+  const results = possiblePaths.map((p) => ({
+    path: p,
+    exists: fs2.existsSync(p),
+    files: fs2.existsSync(p) ? fs2.readdirSync(p).slice(0, 10) : []
+  }));
+  const indexPaths = possiblePaths.map((p) => ({
+    path: path2.join(p, "index.html"),
+    exists: fs2.existsSync(path2.join(p, "index.html"))
+  }));
+  const staticFiles = [
+    path2.join(process.cwd(), "dist", "client", "assets", "main.js"),
+    path2.join(process.cwd(), "dist", "client", "assets", "main.css")
+  ];
+  const fileChecks = staticFiles.map((f) => ({
+    path: f,
+    exists: fs2.existsSync(f)
+  }));
+  res.json({
+    environment: process.env.NODE_ENV,
+    cwd: process.cwd(),
+    dirname: __dirname2,
+    architecture: os.arch(),
+    hostname: os.hostname(),
+    platform: os.platform(),
+    possiblePaths: results,
+    indexFiles: indexPaths,
+    staticFiles: fileChecks
+  });
+});
+router.get("/env", (req, res) => {
+  const safeEnv = { ...process.env };
+  delete safeEnv.DATABASE_URL;
+  delete safeEnv.SESSION_SECRET;
+  delete safeEnv.GITHUB_CLIENT_SECRET;
+  delete safeEnv.PAYPAL_SECRET;
+  res.json({
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.PORT,
+    DOMAIN: process.env.DOMAIN,
+    COOKIE_DOMAIN: process.env.COOKIE_DOMAIN,
+    DEBUG_STATIC: process.env.DEBUG_STATIC,
+    SPA_ROUTING: process.env.SPA_ROUTING
+  });
+});
+router.get("/config", (req, res) => {
+  res.json({
+    staticServing: true,
+    trustProxy: true,
+    cookieSecure: process.env.NODE_ENV === "production",
+    cookieSameSite: "lax",
+    cookieDomain: process.env.NODE_ENV === "production" ? ".skyvps360.xyz" : void 0
+  });
+});
+var debug_routes_default = router;
+
+// server/middleware/security.ts
+function setupSecurityHeaders(req, res, next) {
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' *;"
+  );
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+}
+function inlineFaviconHandler(req, res, next) {
+  if (req.path === "/favicon.ico") {
+    const faviconData = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAR5JREFUeNpiYBgF+ICRUMCyqCMXiP+TgJcB8QQgZoUZ8J9YDfh/AwgYmUDmA3E7kM0GFQRqxAsYoQbMB+L/uAzA5pVGoLdBBq0H4jSQGDafYDPgPxBvgBreSsiQWUAcC1MBdwFmGMC88B/NVevRDa8BYgGoQehqogkZsAeIcyjiuHwAM8wRiJ9hM+Q/LgcxYTGAE4iTsDkCn2FMWAzQA+J0XBphM4AJixdA4ZOOMFSCCMPw5YELaFE2HpQUkWnABqgLNkElQRoxXUbQAKghG4HYBCpUjM1lBAyohtpgBBXqwOYyXAaAUl0KWi5IgzIOToPQsrE31AYdqFA1erRj1YeWkULQnJgLFeqAmgOzqRObASxALAnEUUC8GYhFscoCBBgArZ5CuRL4PjIAAAAASUVORK5CYII=",
+      "base64"
+    );
+    res.setHeader("Content-Type", "image/x-icon");
+    res.setHeader("Content-Length", faviconData.length);
+    res.setHeader("Cache-Control", "public, max-age=2592000");
+    res.end(faviconData);
+  } else {
+    next();
+  }
 }
 
 // server/routes.ts
@@ -801,11 +952,11 @@ var storage = new DatabaseStorage();
 
 // server/vite.ts
 import express2 from "express";
-import path2, { dirname } from "path";
-import { fileURLToPath as fileURLToPath2 } from "url";
+import path3, { dirname } from "path";
+import { fileURLToPath as fileURLToPath3 } from "url";
 import { createServer as createViteServer } from "vite";
-var __filename2 = fileURLToPath2(import.meta.url);
-var __dirname2 = dirname(__filename2);
+var __filename3 = fileURLToPath3(import.meta.url);
+var __dirname3 = dirname(__filename3);
 function log(msg, level = "info") {
   const timestamp4 = (/* @__PURE__ */ new Date()).toLocaleTimeString();
   const prefix = level === "error" ? "\u274C" : "\u2139\uFE0F";
@@ -3094,8 +3245,8 @@ function getServerMonthlyPrice(size) {
 
 // server/routes/health.ts
 import express3 from "express";
-var router = express3.Router();
-router.get("/", async (req, res) => {
+var router2 = express3.Router();
+router2.get("/", async (req, res) => {
   try {
     await pool.query("SELECT 1");
     return res.status(200).json({
@@ -3113,7 +3264,7 @@ router.get("/", async (req, res) => {
     });
   }
 });
-var health_default = router;
+var health_default = router2;
 
 // server/routes.ts
 var COSTS = {
@@ -5170,10 +5321,10 @@ async function registerRoutes(app2) {
 }
 
 // server/vite.js
-import path3 from "path";
-import { fileURLToPath as fileURLToPath3 } from "url";
+import path4 from "path";
+import { fileURLToPath as fileURLToPath4 } from "url";
 import express4 from "express";
-var __dirname3 = path3.dirname(fileURLToPath3(import.meta.url));
+var __dirname4 = path4.dirname(fileURLToPath4(import.meta.url));
 async function setupVite(app2, server) {
   const { createServer: createServer2 } = await import("vite");
   const vite = await createServer2({
@@ -5560,11 +5711,11 @@ async function getUserRepositories(token) {
 // server/routes/github.ts
 import { eq as eq6 } from "drizzle-orm";
 import fetch3 from "node-fetch";
-var router2 = express5.Router();
-router2.use("/repos", requireAuth);
-router2.use("/auth-url", requireAuth);
-router2.use("/disconnect", requireAuth);
-router2.get("/repos", async (req, res) => {
+var router3 = express5.Router();
+router3.use("/repos", requireAuth);
+router3.use("/auth-url", requireAuth);
+router3.use("/disconnect", requireAuth);
+router3.get("/repos", async (req, res) => {
   try {
     const githubToken = req.user.githubToken;
     if (!githubToken) {
@@ -5577,7 +5728,7 @@ router2.get("/repos", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router2.get("/auth-url", async (req, res) => {
+router3.get("/auth-url", async (req, res) => {
   try {
     const clientId2 = process.env.GITHUB_CLIENT_ID?.trim();
     const redirectUri = process.env.GITHUB_REDIRECT_URI?.trim();
@@ -5596,7 +5747,7 @@ router2.get("/auth-url", async (req, res) => {
     res.status(500).json({ error: "Failed to generate GitHub auth URL" });
   }
 });
-router2.get("/callback", async (req, res) => {
+router3.get("/callback", async (req, res) => {
   try {
     const { code } = req.query;
     logger.info(`\u{1F419} [GitHub] Received OAuth callback with code: ${code ? code.toString().substring(0, 10) + "..." : "MISSING"}`);
@@ -5662,7 +5813,7 @@ router2.get("/callback", async (req, res) => {
     res.status(500).json({ error: "Failed to handle GitHub OAuth callback: " + error.message });
   }
 });
-router2.post("/disconnect", async (req, res) => {
+router3.post("/disconnect", async (req, res) => {
   try {
     await saveGitHubToken(req.user.id, null);
     res.json({ success: true });
@@ -5670,7 +5821,7 @@ router2.post("/disconnect", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-var github_default = router2;
+var github_default = router3;
 
 // server/routes/github-webhooks.ts
 import express6 from "express";
@@ -5742,9 +5893,9 @@ async function createAppFromGitHub(userId, options) {
 }
 
 // server/routes/github-webhooks.ts
-var router3 = express6.Router();
+var router4 = express6.Router();
 var WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET || "";
-router3.use(express6.json({
+router4.use(express6.json({
   verify: (req, res, buf) => {
     req.rawBody = buf;
   }
@@ -5778,7 +5929,7 @@ async function findUsersForRepository(repoId, branch) {
     return [];
   }
 }
-router3.post("/", async (req, res) => {
+router4.post("/", async (req, res) => {
   try {
     const event = req.headers["x-github-event"];
     logger.info(`Received GitHub webhook event: ${event}`);
@@ -5830,20 +5981,20 @@ router3.post("/", async (req, res) => {
     res.status(500).json({ error: "Failed to process webhook" });
   }
 });
-var github_webhooks_default = router3;
+var github_webhooks_default = router4;
 
 // server/routes/github-debug.ts
 import express7 from "express";
 import { eq as eq9 } from "drizzle-orm";
 import fetch5 from "node-fetch";
-var router4 = express7.Router();
-router4.use((req, res, next) => {
+var router5 = express7.Router();
+router5.use((req, res, next) => {
   if (!req.user || !req.user.isAdmin) {
     return res.status(403).json({ error: "Admin access required" });
   }
   next();
 });
-router4.get("/status", async (req, res) => {
+router5.get("/status", async (req, res) => {
   try {
     const user = await db.query.users.findFirst({
       where: eq9(users.id, req.user.id)
@@ -5894,7 +6045,7 @@ router4.get("/status", async (req, res) => {
     res.status(500).json({ error: "Failed to get GitHub status" });
   }
 });
-router4.post("/test-webhook", async (req, res) => {
+router5.post("/test-webhook", async (req, res) => {
   try {
     logger.info("Simulating GitHub webhook event");
     const mockPayload = {
@@ -5928,7 +6079,7 @@ router4.post("/test-webhook", async (req, res) => {
     res.status(500).json({ error: "Failed to process test webhook" });
   }
 });
-router4.get("/recent-activity", async (req, res) => {
+router5.get("/recent-activity", async (req, res) => {
   try {
     const mockActivity = [
       {
@@ -5956,7 +6107,7 @@ router4.get("/recent-activity", async (req, res) => {
     res.status(500).json({ error: "Failed to get recent activity" });
   }
 });
-var github_debug_default = router4;
+var github_debug_default = router5;
 
 // server/routes/github-deployments.ts
 import express8 from "express";
@@ -6122,9 +6273,9 @@ async function getAppStatus(appId) {
 }
 
 // server/routes/github-deployments.ts
-var router5 = express8.Router();
-router5.use(requireAuth);
-router5.get("/", async (req, res) => {
+var router6 = express8.Router();
+router6.use(requireAuth);
+router6.get("/", async (req, res) => {
   try {
     logger.info(`Retrieving deployments for user ${req.user.id}`);
     try {
@@ -6142,7 +6293,7 @@ router5.get("/", async (req, res) => {
     res.status(500).json({ error: "Failed to retrieve deployments" });
   }
 });
-router5.post("/", async (req, res) => {
+router6.post("/", async (req, res) => {
   try {
     const { repoFullName, branch = "main" } = req.body;
     if (!repoFullName) {
@@ -6189,7 +6340,7 @@ router5.post("/", async (req, res) => {
     });
   }
 });
-router5.get("/:id", async (req, res) => {
+router6.get("/:id", async (req, res) => {
   try {
     const deploymentId = req.params.id;
     const deployment = await db.select().from(deployments).where(eq10(deployments.id, deploymentId)).limit(1);
@@ -6212,7 +6363,7 @@ router5.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to retrieve deployment" });
   }
 });
-router5.post("/:id/redeploy", async (req, res) => {
+router6.post("/:id/redeploy", async (req, res) => {
   try {
     const [deployment] = await db.select().from(deployments).where(eq10(deployments.id, parseInt(req.params.id, 10))).limit(1);
     if (!deployment || deployment.userId !== req.user.id) {
@@ -6226,7 +6377,7 @@ router5.post("/:id/redeploy", async (req, res) => {
     res.status(500).json({ error: "Failed to redeploy application" });
   }
 });
-router5.post("/:id/restart", async (req, res) => {
+router6.post("/:id/restart", async (req, res) => {
   try {
     const [deployment] = await db.select().from(deployments).where(eq10(deployments.id, parseInt(req.params.id, 10))).limit(1);
     if (!deployment || deployment.userId !== req.user.id) {
@@ -6240,13 +6391,13 @@ router5.post("/:id/restart", async (req, res) => {
     res.status(500).json({ error: "Failed to restart deployment" });
   }
 });
-var github_deployments_default = router5;
+var github_deployments_default = router6;
 
 // server/routes/app-platform.ts
 import express9 from "express";
-var router6 = express9.Router();
-router6.use(requireAuth);
-router6.get("/regions", async (req, res) => {
+var router7 = express9.Router();
+router7.use(requireAuth);
+router7.get("/regions", async (req, res) => {
   try {
     const regions = [
       {
@@ -6304,7 +6455,7 @@ router6.get("/regions", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch regions" });
   }
 });
-router6.get("/sizes", async (req, res) => {
+router7.get("/sizes", async (req, res) => {
   try {
     const sizes = [
       {
@@ -6358,14 +6509,14 @@ router6.get("/sizes", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch sizes" });
   }
 });
-var app_platform_default = router6;
+var app_platform_default = router7;
 
 // server/routes/api-debug.ts
 import express10 from "express";
-import os from "os";
-var router7 = express10.Router();
-router7.use(requireAdmin);
-router7.get("/", async (req, res) => {
+import os2 from "os";
+var router8 = express10.Router();
+router8.use(requireAdmin);
+router8.get("/", async (req, res) => {
   try {
     const env = {
       NODE_ENV: process.env.NODE_ENV,
@@ -6381,12 +6532,12 @@ router7.get("/", async (req, res) => {
       arch: process.arch,
       nodeVersion: process.version,
       memory: {
-        total: `${Math.round(os.totalmem() / (1024 * 1024 * 1024))}GB`,
-        free: `${Math.round(os.freemem() / (1024 * 1024 * 1024))}GB`
+        total: `${Math.round(os2.totalmem() / (1024 * 1024 * 1024))}GB`,
+        free: `${Math.round(os2.freemem() / (1024 * 1024 * 1024))}GB`
       },
-      cpus: os.cpus().length,
-      hostname: os.hostname(),
-      uptime: `${Math.round(os.uptime() / 60 / 60)} hours`
+      cpus: os2.cpus().length,
+      hostname: os2.hostname(),
+      uptime: `${Math.round(os2.uptime() / 60 / 60)} hours`
     };
     res.json({ env, system });
   } catch (error) {
@@ -6394,7 +6545,7 @@ router7.get("/", async (req, res) => {
     res.status(500).json({ error: "Failed to get debug information" });
   }
 });
-router7.get("/github-oauth-url", (req, res) => {
+router8.get("/github-oauth-url", (req, res) => {
   try {
     const clientId2 = process.env.GITHUB_CLIENT_ID?.trim();
     const redirectUri = process.env.GITHUB_REDIRECT_URI?.trim();
@@ -6408,7 +6559,7 @@ router7.get("/github-oauth-url", (req, res) => {
     res.status(500).json({ error: "Failed to generate GitHub auth URL" });
   }
 });
-router7.get("/github-env", (req, res) => {
+router8.get("/github-env", (req, res) => {
   const env = {
     clientId: process.env.GITHUB_CLIENT_ID ? process.env.GITHUB_CLIENT_ID.substring(0, 5) + "..." : null,
     redirectUri: process.env.GITHUB_REDIRECT_URI,
@@ -6417,14 +6568,14 @@ router7.get("/github-env", (req, res) => {
   };
   res.json(env);
 });
-var api_debug_default = router7;
+var api_debug_default = router8;
 
 // server/routes/github-connections.ts
 import express11 from "express";
 import { eq as eq11 } from "drizzle-orm";
-var router8 = express11.Router();
-router8.use(requireAuth);
-router8.get("/status", async (req, res) => {
+var router9 = express11.Router();
+router9.use(requireAuth);
+router9.get("/status", async (req, res) => {
   try {
     const user = req.user;
     res.json({
@@ -6438,7 +6589,7 @@ router8.get("/status", async (req, res) => {
     res.status(500).json({ error: "Failed to get connection status" });
   }
 });
-router8.post("/disconnect", async (req, res) => {
+router9.post("/disconnect", async (req, res) => {
   try {
     await db.update(users).set({
       githubToken: null,
@@ -6452,7 +6603,7 @@ router8.post("/disconnect", async (req, res) => {
     res.status(500).json({ error: "Failed to disconnect GitHub account" });
   }
 });
-router8.get("/connection-details", async (req, res) => {
+router9.get("/connection-details", async (req, res) => {
   try {
     const user = await db.query.users.findFirst({
       where: eq11(users.id, req.user.id)
@@ -6486,7 +6637,7 @@ router8.get("/connection-details", async (req, res) => {
     res.status(500).json({ error: "Failed to get connection details" });
   }
 });
-router8.post("/settings", async (req, res) => {
+router9.post("/settings", async (req, res) => {
   try {
     const { autoDeploy, buildCache } = req.body;
     logger.info(`User ${req.user.id} updated GitHub settings: autoDeploy=${autoDeploy}, buildCache=${buildCache}`);
@@ -6496,7 +6647,7 @@ router8.post("/settings", async (req, res) => {
     res.status(500).json({ error: "Failed to save settings" });
   }
 });
-router8.post("/webhooks/configure", async (req, res) => {
+router9.post("/webhooks/configure", async (req, res) => {
   try {
     const { url, secret } = req.body;
     if (!url) {
@@ -6509,7 +6660,7 @@ router8.post("/webhooks/configure", async (req, res) => {
     res.status(500).json({ error: "Failed to configure webhooks" });
   }
 });
-router8.get("/recent-activity", async (req, res) => {
+router9.get("/recent-activity", async (req, res) => {
   try {
     const mockActivity = [
       {
@@ -6537,7 +6688,7 @@ router8.get("/recent-activity", async (req, res) => {
     res.status(500).json({ error: "Failed to get recent activity" });
   }
 });
-var github_connections_default = router8;
+var github_connections_default = router9;
 
 // server/utils/env.ts
 import dotenv from "dotenv";
@@ -6616,15 +6767,17 @@ async function initializeDatabase() {
 }
 
 // server/index.ts
-var __filename3 = fileURLToPath4(import.meta.url);
-var __dirname4 = path4.dirname(__filename3);
+var __filename4 = fileURLToPath5(import.meta.url);
+var __dirname5 = path5.dirname(__filename4);
 dotenv2.config({ override: true });
 var app = express12();
 app.use(express12.json());
 app.use(express12.urlencoded({ extended: false }));
+app.use(setupSecurityHeaders);
+app.use(inlineFaviconHandler);
 app.use((req, res, next) => {
   const start = Date.now();
-  const path5 = req.path;
+  const path6 = req.path;
   let capturedJsonResponse = void 0;
   const originalResJson = res.json;
   res.json = function(bodyJson, ...args) {
@@ -6633,11 +6786,11 @@ app.use((req, res, next) => {
   };
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path5.startsWith("/api")) {
+    if (path6.startsWith("/api")) {
       logger.api(
         "Request completed",
         req.method,
-        path5,
+        path6,
         res.statusCode,
         duration
       );
@@ -6655,7 +6808,6 @@ app.use((req, res, next) => {
     "www.skyvps360.xyz",
     "localhost",
     req.hostname
-    // Allow current hostname for development
   ];
   res.header(
     "Access-Control-Allow-Origin",
@@ -6667,6 +6819,13 @@ app.use((req, res, next) => {
   app.set("trust proxy", 1);
   next();
 });
+var importPath = (relativePath) => {
+  const isProduction = process.env.NODE_ENV === "production";
+  const basePath = isProduction ? "./dist" : ".";
+  const resolvedPath = path5.join(basePath, relativePath);
+  const fileUrl = new URL(`file://${path5.resolve(resolvedPath)}`).href;
+  return fileUrl;
+};
 async function createTestData() {
   try {
     const admins = await db.select().from(users).where(eq12(users.isAdmin, true));
@@ -6674,20 +6833,16 @@ async function createTestData() {
       const admin = await storage.createUser({
         username: "admin",
         password: await hashPassword("admin123"),
-        // Properly hashed password
         isAdmin: true,
         balance: 1e4,
-        // $100.00 starting balance
         apiKey: null
       });
       logger.success("Created default admin user: admin / admin123");
       const user = await storage.createUser({
         username: "user",
         password: await hashPassword("user123"),
-        // Properly hashed password
         isAdmin: false,
         balance: 5e3,
-        // $50.00 starting balance
         apiKey: null
       });
       logger.success("Created default regular user: user / user123");
@@ -6708,7 +6863,6 @@ async function createTestData() {
         application: null,
         lastMonitored: /* @__PURE__ */ new Date(),
         rootPassword: "Test123!"
-        // Add default root password for test server
       });
       const ticket = await storage.createTicket({
         userId: user.id,
@@ -6729,13 +6883,6 @@ async function createTestData() {
     logger.error("Error creating test data:", error);
   }
 }
-var importPath = (relativePath) => {
-  const isProduction = process.env.NODE_ENV === "production";
-  const basePath = isProduction ? "./dist" : ".";
-  const resolvedPath = path4.join(basePath, relativePath);
-  const fileUrl = new URL(`file://${path4.resolve(resolvedPath)}`).href;
-  return fileUrl;
-};
 (async () => {
   try {
     await pool.query("SELECT 1");
@@ -6774,10 +6921,8 @@ var importPath = (relativePath) => {
     setupAuth(app, {
       cookie: {
         secure: process.env.NODE_ENV === "production",
-        // Secure in production
         httpOnly: true,
         sameSite: "lax",
-        // Less restrictive for better compatibility
         domain: process.env.NODE_ENV === "production" ? ".skyvps360.xyz" : void 0
       }
     });
@@ -6790,17 +6935,18 @@ var importPath = (relativePath) => {
     app.use("/api/github/connections", github_connections_default);
     app.use("/api/app-platform", app_platform_default);
     app.use("/api/debug", api_debug_default);
+    if (process.env.NODE_ENV === "production") {
+      app.use("/api/debug-prod", debug_routes_default);
+    }
     app.use("/auth/github", github_default);
-    app.get("/auth/github/callback", async (req, res) => {
-    });
     app.get("/github-guide", (req, res) => {
       try {
-        const indexPath = path4.resolve(__dirname4, "../dist/client/index.html");
-        if (fs2.existsSync(indexPath)) {
+        const indexPath = path5.resolve(__dirname5, "../dist/client/index.html");
+        if (fs3.existsSync(indexPath)) {
           res.sendFile(indexPath);
         } else {
-          const devIndexPath = path4.resolve(__dirname4, "../client/index.html");
-          if (fs2.existsSync(devIndexPath)) {
+          const devIndexPath = path5.resolve(__dirname5, "../client/index.html");
+          if (fs3.existsSync(devIndexPath)) {
             res.sendFile(devIndexPath);
           } else {
             throw new Error("Could not find index.html");
@@ -6811,18 +6957,8 @@ var importPath = (relativePath) => {
         res.status(500).send("Internal Server Error: Could not load GitHub guide");
       }
     });
-    app.get("*", (req, res, next) => {
-      if (req.path.startsWith("/api/")) {
-        return next();
-      }
-      if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
-        return next();
-      }
-      if (process.env.NODE_ENV === "production") {
-        res.sendFile(path4.resolve(__dirname4, "../client/index.html"));
-      } else {
-        next();
-      }
+    app.get("/health", (req, res) => {
+      res.status(200).json({ status: "ok", environment: process.env.NODE_ENV });
     });
     app.use((err, _req, res, _next) => {
       logger.error("Express error handler:", err);
@@ -6835,14 +6971,24 @@ var importPath = (relativePath) => {
       await setupVite(app, server);
     } else {
       logger.info("Starting server in production mode with static files...");
+      app.get("/", (req, res, next) => {
+        const indexPath = path5.join(process.cwd(), "dist", "client", "index.html");
+        logger.info(`Root path requested, serving index.html from ${indexPath}`);
+        if (fs3.existsSync(indexPath)) {
+          res.sendFile(indexPath);
+        } else {
+          logger.error(`Root index.html not found at ${indexPath}`);
+          next();
+        }
+      });
       setupStaticServing(app);
+      logger.info("Static file serving configured");
     }
     const port = process.env.NODE_ENV === "development" ? 5e3 : process.env.PORT || 8080;
     logger.server(`Starting server on port ${port}, NODE_ENV: ${process.env.NODE_ENV}`);
     server.listen({
       port,
       host: "0.0.0.0",
-      // Explicitly listen on all network interfaces
       reusePort: true
     }, () => {
       logger.success(`Server running on port ${port} and accessible from all network interfaces`);

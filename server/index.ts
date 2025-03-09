@@ -1,9 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
 import dotenv from 'dotenv';
-import path from 'path'; // Add path import
-import fs from 'fs'; // Add fs import
-import { fileURLToPath } from 'url'; // Add fileURLToPath import
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { setupStaticServing } from "./utils/static-handler.js";
+import debugRoutes from './routes/debug-routes.js';
+import { setupSecurityHeaders, inlineFaviconHandler } from './middleware/security.js';
 
 // Define __dirname equivalent for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -13,7 +15,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ override: true });
 
 import { registerRoutes } from "./routes.js";
-import { setupVite, serveStatic, log } from "./vite.js";
+import { setupVite } from "./vite.js";
 import { storage } from "./storage.js";
 import { db, pool } from "./db.js";
 import { users } from "@shared/schema";
@@ -31,10 +33,18 @@ import githubConnectionsRoutes from "./routes/github-connections.js";
 import { loadGitHubCredentials } from './utils/env.js';
 import { initializeDatabase } from './utils/init-db.js';
 
+// Initialize Express
 const app = express();
+
+// Basic middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Add security headers and favicon handler early
+app.use(setupSecurityHeaders);
+app.use(inlineFaviconHandler);
+
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -71,17 +81,17 @@ app.use((req, res, next) => {
   next();
 });
 
-// Add this after the app initialization
+// CORS and cookie domain handling
 app.use((req, res, next) => {
   // Domain handling for cookies
   const allowedDomains = [
     'skyvps360.xyz',
     'www.skyvps360.xyz',
     'localhost',
-    req.hostname // Allow current hostname for development
+    req.hostname
   ];
 
-  // Set CORS headers to allow your domain
+  // Set CORS headers
   res.header('Access-Control-Allow-Origin',
     allowedDomains.includes(req.hostname) ? `https://${req.hostname}` : 'https://skyvps360.xyz');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -90,10 +100,17 @@ app.use((req, res, next) => {
 
   // Trust proxy for secure cookies over HTTPS when behind load balancers
   app.set('trust proxy', 1);
-
-  // Continue with request
   next();
 });
+
+// Helper for importing migration files
+const importPath = (relativePath) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const basePath = isProduction ? './dist' : '.';
+  const resolvedPath = path.join(basePath, relativePath);
+  const fileUrl = new URL(`file://${path.resolve(resolvedPath)}`).href;
+  return fileUrl;
+};
 
 // Create default users and test data
 async function createTestData() {
@@ -105,9 +122,9 @@ async function createTestData() {
       // Create default admin user
       const admin = await storage.createUser({
         username: "admin",
-        password: await hashPassword("admin123"), // Properly hashed password
+        password: await hashPassword("admin123"),
         isAdmin: true,
-        balance: 10000, // $100.00 starting balance
+        balance: 10000,
         apiKey: null
       });
       logger.success("Created default admin user: admin / admin123");
@@ -115,9 +132,9 @@ async function createTestData() {
       // Create a regular user
       const user = await storage.createUser({
         username: "user",
-        password: await hashPassword("user123"), // Properly hashed password
+        password: await hashPassword("user123"),
         isAdmin: false,
-        balance: 5000, // $50.00 starting balance
+        balance: 5000,
         apiKey: null
       });
       logger.success("Created default regular user: user / user123");
@@ -139,7 +156,7 @@ async function createTestData() {
         },
         application: null,
         lastMonitored: new Date(),
-        rootPassword: "Test123!" // Add default root password for test server
+        rootPassword: "Test123!"
       });
 
       // Create a test support ticket
@@ -166,40 +183,18 @@ async function createTestData() {
   }
 }
 
-// Fix import paths function to handle production vs development
-const importPath = (relativePath) => {
-  // In production, migrations are copied to dist/
-  const isProduction = process.env.NODE_ENV === 'production';
-
-  // Use explicit relative path for ESM imports '.';
-  const basePath = isProduction ? './dist' : '.';
-
-  // Convert to a file URL which is compatible with ESM dynamic imports
-  const resolvedPath = path.join(basePath, relativePath);
-  const fileUrl = new URL(`file://${path.resolve(resolvedPath)}`).href;
-
-  return fileUrl;
-};
-
-// Use cwd for better path resolution
-const getRootPath = () => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  return isProduction ? path.resolve(process.cwd()) : path.resolve(process.cwd());
-};
-
+// Main application startup
 (async () => {
   try {
     // Test database connection first
     await pool.query('SELECT 1');
     logger.database("Database connection successful");
 
-    // Initialize database tables directly instead of using migrations
+    // Initialize database tables or run migrations
     if (process.env.NODE_ENV === 'production') {
       await initializeDatabase();
     } else {
-      // Run necessary migrations in development
       try {
-        // Run migrations with proper path resolution
         const migrationsPaths = [
           'migrations/add-snapshots-table.js',
           'migrations/add-github-token.js',
@@ -211,10 +206,8 @@ const getRootPath = () => {
           try {
             const fullPath = importPath(migrationPath);
             console.log(`Attempting to import migration from: ${fullPath}`);
-
             const { runMigration } = await import(fullPath);
             const result = await runMigration();
-
             if (result) {
               logger.success(`Migration ${migrationPath} completed successfully`);
             } else {
@@ -222,7 +215,6 @@ const getRootPath = () => {
             }
           } catch (migrationError) {
             logger.error(`Error running migration ${migrationPath}:`, migrationError);
-            // Continue with other migrations rather than stopping
           }
         }
       } catch (migrationError) {
@@ -239,43 +231,43 @@ const getRootPath = () => {
     // Set up authentication before routes
     setupAuth(app, {
       cookie: {
-        secure: process.env.NODE_ENV === 'production', // Secure in production
+        secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
-        sameSite: 'lax', // Less restrictive for better compatibility
-        domain: process.env.NODE_ENV === 'production'
-          ? '.skyvps360.xyz'  // Note the dot prefix for subdomain support
-          : undefined,
+        sameSite: 'lax',
+        domain: process.env.NODE_ENV === 'production' ? '.skyvps360.xyz' : undefined,
       }
     });
 
-    // Register admin routes before regular routes
+    // Register admin routes
     registerAdminRoutes(app);
 
+    // Register main routes
     const server = await registerRoutes(app);
 
+    // API routes - must come before static serving
     app.use("/api/github", githubRoutes);
     app.use("/api/github/deployments", githubDeploymentsRoutes);
-    app.use("/api/github/webhooks", githubWebhookRoutes); // Register GitHub webhook routes
-    app.use("/api/github/debug", githubDebugRoutes); // Register GitHub debug routes
-    app.use("/api/github/connections", githubConnectionsRoutes); // Add this new route
+    app.use("/api/github/webhooks", githubWebhookRoutes);
+    app.use("/api/github/debug", githubDebugRoutes);
+    app.use("/api/github/connections", githubConnectionsRoutes);
     app.use("/api/app-platform", appPlatformRoutes);
-    app.use('/api/debug', apiDebugRoutes);
+    app.use("/api/debug", apiDebugRoutes);
 
-    // Ensure the route matches what's in the GITHUB_REDIRECT_URI
+    // Debug routes in production
+    if (process.env.NODE_ENV === 'production') {
+      app.use('/api/debug-prod', debugRoutes);
+    }
+
+    // GitHub OAuth routes
     app.use("/auth/github", githubRoutes);
-    // OR adjust your callback handler to match:
-    app.get("/auth/github/callback", async (req, res) => {
-      // Existing callback handler logic
-    });
 
-    // Fix the path undefined error in the GitHub guide route
+    // Special routes before the catch-all
     app.get("/github-guide", (req, res) => {
       try {
         const indexPath = path.resolve(__dirname, '../dist/client/index.html');
         if (fs.existsSync(indexPath)) {
           res.sendFile(indexPath);
         } else {
-          // Fallback path for development
           const devIndexPath = path.resolve(__dirname, '../client/index.html');
           if (fs.existsSync(devIndexPath)) {
             res.sendFile(devIndexPath);
@@ -289,28 +281,9 @@ const getRootPath = () => {
       }
     });
 
-    // Add this near the end of your route definitions, before the error handler
-
-    // Catch-all route for client-side routing - must be after API routes
-    app.get('*', (req, res, next) => {
-      // Skip API routes
-      if (req.path.startsWith('/api/')) {
-        return next();
-      }
-
-      // Skip static assets
-      if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
-        return next();
-      }
-
-      // For all other routes, let the SPA router handle it
-      if (process.env.NODE_ENV === 'production') {
-        // In production, serve from the client build directory
-        res.sendFile(path.resolve(__dirname, '../client/index.html'));
-      } else {
-        // In development, let Vite handle it
-        next();
-      }
+    // Health check endpoint
+    app.get('/health', (req, res) => {
+      res.status(200).json({ status: 'ok', environment: process.env.NODE_ENV });
     });
 
     // Global error handler
@@ -318,29 +291,42 @@ const getRootPath = () => {
       logger.error("Express error handler:", err);
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
-
       res.status(status).json({ message });
     });
 
-    // importantly only setup vite in development and after
-    // setting up all the other routes so the catch-all route
-    // doesn't interfere with the other routes
+    // Environment-specific setup
     if (app.get("env") === "development") {
       logger.info("Starting server in development mode with Vite middleware...");
       await setupVite(app, server);
     } else {
       // Production mode
       logger.info("Starting server in production mode with static files...");
+
+      // Handle root path explicitly
+      app.get('/', (req, res, next) => {
+        const indexPath = path.join(process.cwd(), 'dist', 'client', 'index.html');
+        logger.info(`Root path requested, serving index.html from ${indexPath}`);
+
+        if (fs.existsSync(indexPath)) {
+          res.sendFile(indexPath);
+        } else {
+          logger.error(`Root index.html not found at ${indexPath}`);
+          next();
+        }
+      });
+
+      // Setup static serving
       setupStaticServing(app);
+      logger.info("Static file serving configured");
     }
 
-    // Use port 5000 for development
+    // Start the server
     const port = process.env.NODE_ENV === 'development' ? 5000 : (process.env.PORT || 8080);
     logger.server(`Starting server on port ${port}, NODE_ENV: ${process.env.NODE_ENV}`);
 
     server.listen({
       port,
-      host: "0.0.0.0", // Explicitly listen on all network interfaces
+      host: "0.0.0.0",
       reusePort: true,
     }, () => {
       logger.success(`Server running on port ${port} and accessible from all network interfaces`);
