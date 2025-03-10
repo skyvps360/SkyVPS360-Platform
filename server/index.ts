@@ -302,20 +302,8 @@ async function createTestData() {
       // Production mode
       logger.info("Starting server in production mode with static files...");
 
-      // Handle root path explicitly
-      app.get('/', (req, res, next) => {
-        const indexPath = path.join(process.cwd(), 'dist', 'client', 'index.html');
-        logger.info(`Root path requested, serving index.html from ${indexPath}`);
-
-        if (fs.existsSync(indexPath)) {
-          res.sendFile(indexPath);
-        } else {
-          logger.error(`Root index.html not found at ${indexPath}`);
-          next();
-        }
-      });
-
-      // Setup static serving
+      // Remove the explicit root handler and use the complete static serving setup
+      // The setupStaticServing function will handle all static files and SPA routes
       setupStaticServing(app);
       logger.info("Static file serving configured");
     }
