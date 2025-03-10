@@ -1,6 +1,5 @@
-
 {
-  "name": "CloudRack",
+  "name": "SkyVPS360",
   "description": "Cloud management platform",
   "env": {
     "NODE_ENV": {
