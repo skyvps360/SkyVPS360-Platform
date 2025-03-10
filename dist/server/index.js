@@ -9,13 +9,12 @@ import express12 from "express";
 import dotenv2 from "dotenv";
 import path5 from "path";
 import fs3 from "fs";
-import { fileURLToPath as fileURLToPath5 } from "url";
+import { fileURLToPath as fileURLToPath4 } from "url";
 
 // server/utils/static-handler.ts
 import fs from "fs";
 import path from "path";
 import express from "express";
-import { fileURLToPath } from "url";
 
 // server/utils/logger.ts
 var colors = {
@@ -103,125 +102,48 @@ var logger = {
 };
 
 // server/utils/static-handler.ts
-var __filename = fileURLToPath(import.meta.url);
-var __dirname = path.dirname(__filename);
 function setupStaticServing(app2) {
-  const isProd = process.env.NODE_ENV === "production";
-  if (!isProd) {
-    logger.info("Not in production, skipping static file setup");
-    return;
-  }
-  logger.info(`Current working directory: ${process.cwd()}`);
-  logger.info(`__dirname: ${__dirname}`);
-  const possibleClientPaths = [
-    path.join(process.cwd(), "dist", "client"),
-    path.join(__dirname, "..", "..", "dist", "client"),
-    path.join(__dirname, "..", "..", "..", "dist", "client"),
-    path.join(process.cwd(), "client")
-  ];
-  possibleClientPaths.forEach((testPath, index) => {
-    const exists = fs.existsSync(testPath);
-    logger.info(`Checking path ${index + 1}: ${testPath} - ${exists ? "EXISTS" : "NOT FOUND"}`);
-  });
-  const clientPath = possibleClientPaths.find((p) => fs.existsSync(p)) || possibleClientPaths[0];
+  const clientPath = path.join(process.cwd(), "dist", "client");
   if (!fs.existsSync(clientPath)) {
-    try {
-      fs.mkdirSync(clientPath, { recursive: true });
-      logger.info(`Created client directory at: ${clientPath}`);
-    } catch (err) {
-      logger.error(`Failed to create client directory: ${err.message}`);
-    }
-  } else {
-    try {
-      const files = fs.readdirSync(clientPath).slice(0, 5);
-      logger.info(`Found client directory at: ${clientPath}`);
-      logger.info(`Files in directory: ${files.join(", ")}`);
-    } catch (err) {
-      logger.error(`Error reading directory: ${err.message}`);
-    }
+    logger.error(`Client path not found: ${clientPath}`);
+    throw new Error("Client path not found");
   }
-  app2.use((req, res, next) => {
-    res.setHeader(
-      "Content-Security-Policy",
-      "default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' *;"
-    );
-    next();
-  });
-  app2.use((req, res, next) => {
-    if (req.path.endsWith("/") && req.path !== "/") {
-      const pathWithoutTrailingSlash = req.path.slice(0, -1);
-      return res.redirect(301, pathWithoutTrailingSlash);
-    }
-    next();
-  });
+  logger.info(`Serving static files from: ${clientPath}`);
   app2.use(express.static(clientPath, {
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith(".html")) {
-        res.setHeader("Cache-Control", "no-cache");
-      } else if (filePath.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
-        res.setHeader("Cache-Control", "public, max-age=86400");
-      }
-    }
+    maxAge: "1d",
+    index: false
+    // Disable auto-index to handle SPA routing manually
   }));
-  app2.get("/", (req, res) => {
-    logger.info("Root path requested, serving index.html");
-    const indexPath = path.join(clientPath, "index.html");
-    res.sendFile(indexPath);
-  });
-  app2.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api/") || req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
-      return next();
+  app2.get("*", (req, res) => {
+    if (req.path.startsWith("/api/")) {
+      return res.status(404).json({ message: "API endpoint not found" });
     }
-    logger.info(`SPA route handler for: ${req.path}, serving index.html`);
+    logger.info(`SPA route handler: ${req.path}`);
     const indexPath = path.join(clientPath, "index.html");
-    res.sendFile(indexPath, (err) => {
-      if (err) {
-        logger.error(`Error sending index.html: ${err.message}`);
-        res.status(200).send(`
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="UTF-8">
-            <title>SkyVPS360 Platform</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <link rel="icon" href="data:,">
-            <style>
-              body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-              .content { text-align: center; }
-            </style>
-          </head>
-          <body>
-            <div class="content">
-              <h1>SkyVPS360 Platform</h1>
-              <p>Loading application...</p>
-              <script>
-                setTimeout(() => { window.location.href = '/auth'; }, 3000);
-              </script>
-            </div>
-          </body>
-          </html>
-        `);
-      }
-    });
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      logger.error(`index.html not found at ${indexPath}`);
+      res.status(500).send("Server Error: index.html not found");
+    }
   });
-  logger.success("Static file serving configured successfully");
 }
 
 // server/routes/debug-routes.js
 import { Router } from "express";
 import fs2 from "fs";
 import path2 from "path";
-import { fileURLToPath as fileURLToPath2 } from "url";
+import { fileURLToPath } from "url";
 import os from "os";
-var __filename2 = fileURLToPath2(import.meta.url);
-var __dirname2 = path2.dirname(__filename2);
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = path2.dirname(__filename);
 var router = Router();
 router.get("/paths", (req, res) => {
   const isProduction = process.env.NODE_ENV === "production";
   const possiblePaths = [
     path2.join(process.cwd(), "dist", "client"),
-    path2.join(__dirname2, "..", "..", "dist", "client"),
-    path2.join(__dirname2, "..", "..", "..", "dist", "client"),
+    path2.join(__dirname, "..", "..", "dist", "client"),
+    path2.join(__dirname, "..", "..", "..", "dist", "client"),
     path2.join(process.cwd(), "client"),
     path2.join(process.cwd())
   ];
@@ -245,7 +167,7 @@ router.get("/paths", (req, res) => {
   res.json({
     environment: process.env.NODE_ENV,
     cwd: process.cwd(),
-    dirname: __dirname2,
+    dirname: __dirname,
     architecture: os.arch(),
     hostname: os.hostname(),
     platform: os.platform(),
@@ -280,32 +202,8 @@ router.get("/config", (req, res) => {
 });
 var debug_routes_default = router;
 
-// server/middleware/security.ts
-function setupSecurityHeaders(req, res, next) {
-  res.setHeader(
-    "Content-Security-Policy",
-    "default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' *;"
-  );
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("X-XSS-Protection", "1; mode=block");
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  next();
-}
-function inlineFaviconHandler(req, res, next) {
-  if (req.path === "/favicon.ico") {
-    const faviconData = Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAR5JREFUeNpiYBgF+ICRUMCyqCMXiP+TgJcB8QQgZoUZ8J9YDfh/AwgYmUDmA3E7kM0GFQRqxAsYoQbMB+L/uAzA5pVGoLdBBq0H4jSQGDafYDPgPxBvgBreSsiQWUAcC1MBdwFmGMC88B/NVevRDa8BYgGoQehqogkZsAeIcyjiuHwAM8wRiJ9hM+Q/LgcxYTGAE4iTsDkCn2FMWAzQA+J0XBphM4AJixdA4ZOOMFSCCMPw5YELaFE2HpQUkWnABqgLNkElQRoxXUbQAKghG4HYBCpUjM1lBAyohtpgBBXqwOYyXAaAUl0KWi5IgzIOToPQsrE31AYdqFA1erRj1YeWkULQnJgLFeqAmgOzqRObASxALAnEUUC8GYhFscoCBBgArZ5CuRL4PjIAAAAASUVORK5CYII=",
-      "base64"
-    );
-    res.setHeader("Content-Type", "image/x-icon");
-    res.setHeader("Content-Length", faviconData.length);
-    res.setHeader("Cache-Control", "public, max-age=2592000");
-    res.end(faviconData);
-  } else {
-    next();
-  }
-}
+// server/index.ts
+import cors from "cors";
 
 // server/routes.ts
 import { createServer } from "http";
@@ -953,10 +851,10 @@ var storage = new DatabaseStorage();
 // server/vite.ts
 import express2 from "express";
 import path3, { dirname } from "path";
-import { fileURLToPath as fileURLToPath3 } from "url";
+import { fileURLToPath as fileURLToPath2 } from "url";
 import { createServer as createViteServer } from "vite";
-var __filename3 = fileURLToPath3(import.meta.url);
-var __dirname3 = dirname(__filename3);
+var __filename2 = fileURLToPath2(import.meta.url);
+var __dirname2 = dirname(__filename2);
 function log(msg, level = "info") {
   const timestamp4 = (/* @__PURE__ */ new Date()).toLocaleTimeString();
   const prefix = level === "error" ? "\u274C" : "\u2139\uFE0F";
@@ -5322,9 +5220,9 @@ async function registerRoutes(app2) {
 
 // server/vite.js
 import path4 from "path";
-import { fileURLToPath as fileURLToPath4 } from "url";
+import { fileURLToPath as fileURLToPath3 } from "url";
 import express4 from "express";
-var __dirname4 = path4.dirname(fileURLToPath4(import.meta.url));
+var __dirname3 = path4.dirname(fileURLToPath3(import.meta.url));
 async function setupVite(app2, server) {
   const { createServer: createServer2 } = await import("vite");
   const vite = await createServer2({
@@ -6767,14 +6665,18 @@ async function initializeDatabase() {
 }
 
 // server/index.ts
-var __filename4 = fileURLToPath5(import.meta.url);
-var __dirname5 = path5.dirname(__filename4);
+var __filename3 = fileURLToPath4(import.meta.url);
+var __dirname4 = path5.dirname(__filename3);
 dotenv2.config({ override: true });
 var app = express12();
 app.use(express12.json());
 app.use(express12.urlencoded({ extended: false }));
-app.use(setupSecurityHeaders);
-app.use(inlineFaviconHandler);
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+}));
+app.set("trust proxy", true);
 app.use((req, res, next) => {
   const start = Date.now();
   const path6 = req.path;
@@ -6803,19 +6705,22 @@ app.use((req, res, next) => {
   next();
 });
 app.use((req, res, next) => {
+  const origin = req.headers.origin || "";
   const allowedDomains = [
     "skyvps360.xyz",
     "www.skyvps360.xyz",
     "localhost",
     req.hostname
+    // You can add specific additional domains here
   ];
-  res.header(
-    "Access-Control-Allow-Origin",
-    allowedDomains.includes(req.hostname) ? `https://${req.hostname}` : "https://skyvps360.xyz"
-  );
+  const allowOrigin = process.env.NODE_ENV === "development" ? origin : allowedDomains.includes(new URL(origin).hostname) ? origin : "https://skyvps360.xyz";
+  res.header("Access-Control-Allow-Origin", allowOrigin);
   res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
   app.set("trust proxy", 1);
   next();
 });
@@ -6941,11 +6846,11 @@ async function createTestData() {
     app.use("/auth/github", github_default);
     app.get("/github-guide", (req, res) => {
       try {
-        const indexPath = path5.resolve(__dirname5, "../dist/client/index.html");
+        const indexPath = path5.resolve(__dirname4, "../dist/client/index.html");
         if (fs3.existsSync(indexPath)) {
           res.sendFile(indexPath);
         } else {
-          const devIndexPath = path5.resolve(__dirname5, "../client/index.html");
+          const devIndexPath = path5.resolve(__dirname4, "../client/index.html");
           if (fs3.existsSync(devIndexPath)) {
             res.sendFile(devIndexPath);
           } else {
@@ -6971,16 +6876,6 @@ async function createTestData() {
       await setupVite(app, server);
     } else {
       logger.info("Starting server in production mode with static files...");
-      app.get("/", (req, res, next) => {
-        const indexPath = path5.join(process.cwd(), "dist", "client", "index.html");
-        logger.info(`Root path requested, serving index.html from ${indexPath}`);
-        if (fs3.existsSync(indexPath)) {
-          res.sendFile(indexPath);
-        } else {
-          logger.error(`Root index.html not found at ${indexPath}`);
-          next();
-        }
-      });
       setupStaticServing(app);
       logger.info("Static file serving configured");
     }

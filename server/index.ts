@@ -5,7 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupStaticServing } from "./utils/static-handler.js";
 import debugRoutes from './routes/debug-routes.js';
-import { setupSecurityHeaders, inlineFaviconHandler } from './middleware/security.js';
+// import { setupSecurityHeaders, inlineFaviconHandler } from './middleware/security.js';
 import cors from 'cors';
 
 // Define __dirname equivalent for ESM
@@ -42,8 +42,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Add security headers and favicon handler early
-app.use(setupSecurityHeaders);
-app.use(inlineFaviconHandler);
+// app.use(setupSecurityHeaders);
+// app.use(inlineFaviconHandler);
 
 // Add CORS middleware
 app.use(cors({

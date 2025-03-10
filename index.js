@@ -8,11 +8,57 @@ import { execSync } from 'child_process';
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Debug mode for startup issues
+const DEBUG_MODE = true;
+
+// Debug helper function
+function debug(message, obj = null) {
+  if (DEBUG_MODE) {
+    console.log(`[DEBUG] ${message}`);
+    if (obj) {
+      console.dir(obj, { depth: null, colors: true });
+    }
+  }
+}
+
+// Error handler with additional context
+function handleError(phase, error) {
+  console.error(`\n❌ ERROR during ${phase}:`);
+  console.error(error);
+
+  // Additional debug info
+  if (DEBUG_MODE) {
+    console.error('\nDebug Information:');
+    console.error('- Node version:', process.version);
+    console.error('- Current directory:', process.cwd());
+    console.error('- Available files in dist/server:');
+    try {
+      const serverDir = resolve(__dirname, 'dist/server');
+      if (fs.existsSync(serverDir)) {
+        console.error('  ' + fs.readdirSync(serverDir).join('\n  '));
+      } else {
+        console.error('  (directory does not exist)');
+      }
+    } catch (e) {
+      console.error('  Error listing directory:', e.message);
+    }
+  }
+}
+
 // Add environment validation
 const requiredEnvVars = [
   'DATABASE_URL',
   'NODE_ENV'
 ];
+
+debug('Starting application with environment variables:');
+debug('Environment vars:', {
+  NODE_ENV: process.env.NODE_ENV,
+  PORT: process.env.PORT,
+  DATABASE_URL: process.env.DATABASE_URL ? '***REDACTED***' : undefined,
+  DEBUG_STATIC: process.env.DEBUG_STATIC,
+  SPA_ROUTING: process.env.SPA_ROUTING
+});
 
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
@@ -32,8 +78,10 @@ console.log('Environment:', process.env.NODE_ENV || 'development');
 if (process.env.NODE_ENV === 'production') {
   const serverPath = resolve(__dirname, 'dist/server/index.js');
 
+  debug('Production mode detected. Checking for server file at:', serverPath);
+
   if (!fs.existsSync(serverPath)) {
-    console.error('Error: Built server file not found at', serverPath);
+    handleError('file checking', new Error(`Built server file not found at ${serverPath}`));
     console.error('Make sure the build process completed successfully.');
     process.exit(1);
   }
@@ -43,18 +91,36 @@ if (process.env.NODE_ENV === 'production') {
   // Run migrations first
   console.log('Running database migrations...');
   try {
+    debug('Attempting to run migrations from:', './migrations/add-deployments-table.js');
+
     // Use dynamic import for migrations
     import('./migrations/add-deployments-table.js')
-      .then(module => module.runMigration())
+      .then(module => {
+        debug('Migration module imported successfully');
+        return module.runMigration();
+      })
       .then(() => console.log('Deployments table migration completed'))
-      .catch(error => console.error('Error running deployments migration:', error));
+      .catch(error => {
+        handleError('migration', error);
+      });
   } catch (error) {
-    console.error('Error importing migration module:', error);
+    handleError('migration import', error);
+  }
+
+  // Check for client files
+  debug('Checking for client files:');
+  const clientPath = resolve(__dirname, 'dist/client');
+  if (fs.existsSync(clientPath)) {
+    const clientFiles = fs.readdirSync(clientPath);
+    debug(`Found ${clientFiles.length} files in client directory`);
+  } else {
+    console.warn('⚠️ Client files directory not found at:', clientPath);
   }
 
   // Import the server in production
+  debug('Attempting to import server from:', serverPath);
   import(serverPath).catch(err => {
-    console.error('Failed to start production server:', err);
+    handleError('server import', err);
     process.exit(1);
   });
 } else {
@@ -62,10 +128,11 @@ if (process.env.NODE_ENV === 'production') {
   console.log('Starting development server...');
 
   try {
+    debug('Running development server with tsx');
     // Run with tsx which handles TypeScript files better with ESM
     execSync('npx tsx server/index.ts', { stdio: 'inherit' });
   } catch (error) {
-    console.error('Failed to start development server:', error);
+    handleError('development server', error);
     process.exit(1);
   }
 }
