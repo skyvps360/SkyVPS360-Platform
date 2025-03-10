@@ -325,7 +325,7 @@ export default function AccountPage() {
                     </p>
                     <div className="bg-muted p-2 rounded-md overflow-x-auto">
                       <code className="text-xs">
-                        https://api.skyvps360.com/v1
+                        https://skyvps360.xyz/api
                       </code>
                     </div>
                   </div>
@@ -334,7 +334,7 @@ export default function AccountPage() {
                     <h3 className="font-medium">Example Request</h3>
                     <div className="bg-muted p-2 rounded-md overflow-x-auto">
                       <code className="text-xs whitespace-pre">
-                        {`fetch('https://api.skyvps360.com/v1/servers', {
+                        {`fetch('https://skyvps360.xyz/api/servers', {
   method: 'GET',
   headers: {
     'Authorization': 'Bearer YOUR_API_KEY',

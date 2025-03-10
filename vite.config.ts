@@ -82,20 +82,30 @@ export default defineConfig({
     'import.meta.env.BASE_URL': JSON.stringify('/'),
     'import.meta.env.VITE_DOMAIN': JSON.stringify(process.env.DOMAIN || 'https://skyvps360.xyz')
   },
-    // Make sure it watches the right files
-    watch: {
-      usePolling: false,
-      ignored: ['**/node_modules/**', '**/dist/**']
-    },
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      }
-    },
+  // Make sure it watches the right files
+  watch: {
+    usePolling: false,
+    ignored: ['**/node_modules/**', '**/dist/**']
+  },
+  proxy: {
+    '/api': {
+      target: 'http://localhost:5000',
+      changeOrigin: true,
+    }
+  },
   // Prevent caching issues
   cacheDir: path.resolve(__dirname, 'node_modules/.vite_clean'),
   clearScreen: false,
   // Enable detailed logging
   logLevel: 'info',
+  server: {
+    // Allow all hosts explicitly including skyvps360.xyz
+    allowedHosts: ['*', 'skyvps360.xyz'],
+    cors: true,
+    host: '0.0.0.0',
+    hmr: {
+      clientPort: 5000, // Force client port for proxied environments
+      host: 'skyvps360.xyz' // Allow HMR connections from your domain
+    }
 });
+
