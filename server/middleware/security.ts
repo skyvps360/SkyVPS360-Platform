@@ -7,7 +7,7 @@ export function setupSecurityHeaders(req: Request, res: Response, next: NextFunc
   // Set Content-Security-Policy
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' *;"
+    "default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.paypal.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' *;"
   );
 
   // Add other security headers
