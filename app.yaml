@@ -23,4 +23,4 @@ services:
     scope: RUN_AND_BUILD_TIME
     value: "5000"
   health_check:
-    http_path: /health
+    http_path: /

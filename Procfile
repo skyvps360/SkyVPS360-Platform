@@ -1,1 +1,1 @@
-web: node index.js
+web: set -a; source .env; set +a && npm run dev
