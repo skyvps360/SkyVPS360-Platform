@@ -80,20 +80,8 @@ export default defineConfig({
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
     'import.meta.env.BASE_URL': JSON.stringify('/'),
-    'import.meta.env.VITE_DOMAIN': JSON.stringify(process.env.DOMAIN || '*')
+    'import.meta.env.VITE_DOMAIN': JSON.stringify(process.env.DOMAIN || 'https://skyvps360.xyz')
   },
-  server: {
-    allowedHosts: 'all',  // Allow any host
-    cors: {
-      origin: '*',        // Allow requests from any origin
-      credentials: true,  // Allow credentials
-    },
-    host: '0.0.0.0',      // Listen on all network interfaces
-    hmr: {
-      clientPort: process.env.HMR_CLIENT_PORT || 443, // Use env variable or default to 443
-      host: process.env.HMR_HOST || '0.0.0.0',      // Use env variable or default
-      protocol: process.env.HMR_PROTOCOL || 'wss',    // Use env variable or default
-    },
     // Make sure it watches the right files
     watch: {
       usePolling: false,
