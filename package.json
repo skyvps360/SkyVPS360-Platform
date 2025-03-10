@@ -31,7 +31,8 @@
     "build:production": "npm run fix-schema-imports && cross-env NODE_ENV=production npm run build",
     "fix-schema-types": "node scripts/fix-schema-types.mjs",
     "clean-dev": "bash ./clean-restart.sh",
-    "start:prod": "bash ./start.sh"
+    "start:prod": "bash ./start.sh",
+    "build:digitalocean": "npm install @vitejs/plugin-react @replit/vite-plugin-cartographer @replit/vite-plugin-runtime-error-modal @replit/vite-plugin-shadcn-theme-json esbuild tailwindcss autoprefixer postcss && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -72,7 +73,6 @@
     "@tinymce/tinymce-react": "^6.0.0",
     "@types/pg": "^8.11.11",
     "@types/ssh2": "^1.15.4",
-    "@vitejs/plugin-react": "^4.3.2",
     "@xterm/addon-fit": "latest",
     "@xterm/addon-web-links": "latest",
     "@xterm/xterm": "latest",
@@ -137,12 +137,12 @@
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@types/ws": "^8.5.13",
-    "@vitejs/plugin-react": "^4.3.2",
-    "autoprefixer": "^10.4.20",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.21",
     "cross-env": "^7.0.3",
-    "esbuild": "^0.25.0",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^3.4.14",
+    "esbuild": "^0.25.1",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
     "terser": "^5.39.0",
     "tsx": "^4.19.1",
     "typescript": "5.6.3"

@@ -1,12 +1,24 @@
 #!/bin/bash
 set -e
+echo "🚀 Starting SkyVPS360 Platform in production mode..."
 
-echo "🚀 Starting SkyVPS360 Platform in development mode..."
+# Set environment for production
+export NODE_ENV=production
 
-# Run database migrations with --accept-data-loss flag to prevent interactive prompts
-echo "🗄️ Running database migrations..."
-NODE_ENV=development npx drizzle-kit push --accept-data-loss || echo "⚠️ Migration warnings (continuing anyway)"
-
-# Start the application in development mode
-echo "🌐 Starting development server..."
-npm run dev
+# Check if we're in the dist directory or need to navigate to it
+if [ -f "./dist/server/index.js" ]; then
+  echo "🗄️ Running from project root directory"
+  # Copy migrations directory if needed
+  if [ ! -d "./dist/migrations" ]; then
+    echo "📁 Copying migrations directory..."
+    cp -r ./migrations ./dist/
+  fi
+  
+  # Start the application in production mode
+  echo "🌐 Starting production server..."
+  node ./dist/server/index.js
+else
+  echo "🌐 Starting production server..."
+  # Already at the correct location (likely in DigitalOcean)
+  node dist/server/index.js
+fi
