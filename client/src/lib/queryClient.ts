@@ -17,52 +17,51 @@ async function throwIfResNotOk(res: Response) {
 
 // Combined and improved apiRequest function
 export async function apiRequest(
-  methodOrUrl: string,
-  urlOrData?: string | unknown,
-  data?: unknown | undefined,
-  options?: RequestInit
-): Promise<any> {
-  // Support both (method, url, data) and (url, method, data) formats
-  let method: string;
-  let url: string;
-  let requestData: unknown | undefined;
+  method: string,
+  url: string,
+  body?: any,
+  customHeaders?: Record<string, string>
+) {
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...customHeaders,
+    };
 
-  if (urlOrData && typeof urlOrData === 'string' && !['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].includes(methodOrUrl)) {
-    // New format: (url, method?, data?)
-    url = methodOrUrl;
-    method = urlOrData as string || 'GET';
-    requestData = data;
-  } else {
-    // Old format: (method, url, data?)
-    method = methodOrUrl;
-    url = urlOrData as string;
-    requestData = data;
+    const options: RequestInit = {
+      method,
+      headers,
+      credentials: 'include',
+    };
+
+    if (body && method !== 'GET') {
+      options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(url, options);
+
+    // Log errors for debugging
+    if (!response.ok) {
+      console.error(`API Error (${method} ${url}):`, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+
+      // Try to get error details from response
+      try {
+        const errorData = await response.json();
+        console.error('Error details:', errorData);
+      } catch (e) {
+        console.error('No JSON error details available');
+      }
+    }
+
+    return response;
+  } catch (error) {
+    console.error(`Network Error (${method} ${url}):`, error);
+    throw error;
   }
-
-  // Add API_URL prefix if needed
-  if (!url.startsWith('http')) {
-    url = `${import.meta.env.VITE_API_URL || ''}${url}`;
-  }
-
-  const response = await fetch(url, {
-    method,
-    headers: {
-      ...(requestData ? { "Content-Type": "application/json" } : {}),
-    },
-    body: requestData ? JSON.stringify(requestData) : undefined,
-    credentials: "include", // Always include cookies with requests
-    ...options
-  });
-
-  await throwIfResNotOk(response);
-  
-  // Handle empty responses or non-JSON content
-  const contentType = response.headers.get('content-type');
-  if (response.status === 204 || !contentType || !contentType.includes('application/json')) {
-    return null;
-  }
-  
-  return response.json();
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -112,7 +111,26 @@ export const queryClient = new QueryClient({
       queryFn: async ({ queryKey }) => {
         if (typeof queryKey[0] === 'string' && queryKey[0].startsWith('/api')) {
           console.log('Fetching data for:', queryKey[0]);
-          return apiRequest('GET', queryKey[0] as string);
+          // THIS IS THE FIX: Parse the response JSON before returning
+          const response = await apiRequest('GET', queryKey[0] as string);
+
+          // For 204 responses (No Content)
+          if (response.status === 204) {
+            return null;
+          }
+
+          // Handle non-OK responses
+          if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`);
+          }
+
+          // Parse and return the JSON
+          try {
+            return await response.json();
+          } catch (error) {
+            console.error('Failed to parse response as JSON:', error);
+            throw new Error('Invalid JSON in API response');
+          }
         }
         return null;
       },

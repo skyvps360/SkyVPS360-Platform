@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { setupStaticServing } from "./utils/static-handler.js";
 import debugRoutes from './routes/debug-routes.js';
 import { setupSecurityHeaders, inlineFaviconHandler } from './middleware/security.js';
+import cors from 'cors';
 
 // Define __dirname equivalent for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -43,6 +44,16 @@ app.use(express.urlencoded({ extended: false }));
 // Add security headers and favicon handler early
 app.use(setupSecurityHeaders);
 app.use(inlineFaviconHandler);
+
+// Add CORS middleware
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+// Make sure we trust proxies if behind a reverse proxy
+app.set('trust proxy', true);
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -83,20 +94,34 @@ app.use((req, res, next) => {
 
 // CORS and cookie domain handling
 app.use((req, res, next) => {
-  // Domain handling for cookies
+  // Get the origin from the request headers
+  const origin = req.headers.origin || '';
+
+  // Domain handling for cookies - extended to be more permissive
   const allowedDomains = [
     'skyvps360.xyz',
     'www.skyvps360.xyz',
     'localhost',
-    req.hostname
+    req.hostname,
+    // You can add specific additional domains here
   ];
 
-  // Set CORS headers
-  res.header('Access-Control-Allow-Origin',
-    allowedDomains.includes(req.hostname) ? `https://${req.hostname}` : 'https://skyvps360.xyz');
+  // Set CORS headers - more permissive approach
+  const allowOrigin = process.env.NODE_ENV === 'development'
+    ? origin  // Allow any origin in development
+    : allowedDomains.includes(new URL(origin).hostname)
+      ? origin
+      : 'https://skyvps360.xyz';
+
+  res.header('Access-Control-Allow-Origin', allowOrigin);
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   // Trust proxy for secure cookies over HTTPS when behind load balancers
   app.set('trust proxy', 1);

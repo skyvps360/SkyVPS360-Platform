@@ -33,6 +33,10 @@ export async function setupVite(app: Express, server: Server) {
           usePolling: false,
           interval: 1000,
         },
+        // Add these lines to allow all hosts
+        cors: true,
+        host: '0.0.0.0',
+        strictPort: false,
       },
       appType: "custom",
       logLevel: 'info',
@@ -44,6 +48,17 @@ export async function setupVite(app: Express, server: Server) {
 
     // Apply Vite middleware
     app.use(vite.middlewares);
+
+    // Add CORS headers middleware
+    app.use((req, res, next) => {
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+      res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+      if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+      }
+      next();
+    });
 
     // Simple SPA catch-all route
     app.use('*', async (req, res, next) => {

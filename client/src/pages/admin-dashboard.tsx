@@ -10,22 +10,22 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { 
-  Search, 
-  RefreshCcw, 
-  User as UserIcon, 
-  Server as ServerIcon, 
-  MessageCircle, 
-  ArrowLeft, 
+import {
+  Search,
+  RefreshCcw,
+  User as UserIcon,
+  Server as ServerIcon,
+  MessageCircle,
+  ArrowLeft,
   Timer,
-  RotateCcw 
+  RotateCcw
 } from "lucide-react";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
 
 // Define interfaces for our data types
@@ -66,7 +66,10 @@ export default function AdminDashboard() {
   const [userSearchTerm, setUserSearchTerm] = useState("");
   const [ticketSearchTerm, setTicketSearchTerm] = useState("");
   const [serverSearchTerm, setServerSearchTerm] = useState("");
-  
+
+  // Add error state tracking
+  const [apiErrors, setApiErrors] = useState<{ [key: string]: string }>({});
+
   // Auto-refresh functionality
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("users");
@@ -98,7 +101,7 @@ export default function AdminDashboard() {
           queryClient.invalidateQueries({ queryKey: ["/api/admin/servers"] });
         }
       }, autoRefreshInterval * 60 * 1000); // Convert minutes to milliseconds
-      
+
       intervalRef.current = interval;
     }
   }, [autoRefreshInterval, activeTab, queryClient]);
@@ -112,64 +115,76 @@ export default function AdminDashboard() {
   if (!user?.isAdmin) {
     return <Redirect to="/dashboard" />;
   }
-  
+
   // Main return with consistent styling
 
-  // Fetch all users
-  const { data: users = [], isLoading: usersLoading } = useQuery({
+  // Fetch all users with improved error handling
+  const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ["/api/admin/users"],
     queryFn: async () => {
-      const response = await fetch("/api/admin/users", {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch users");
+      try {
+        const response = await apiRequest("GET", "/api/admin/users");
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `API error: ${response.status}`);
+        }
+
+        return response.json();
+      } catch (error) {
+        const errorMessage = (error as Error).message || "Failed to fetch users";
+        setApiErrors(prev => ({ ...prev, users: errorMessage }));
+        console.error("Error fetching users:", error);
+        throw error;
       }
-      
-      return response.json() as Promise<AdminUser[]>;
     },
+    retry: 1,
   });
 
-  // Fetch all tickets
-  const { data: tickets = [], isLoading: ticketsLoading } = useQuery({
+  // Fetch all tickets with improved error handling
+  const { data: tickets = [], isLoading: ticketsLoading, error: ticketsError } = useQuery({
     queryKey: ["/api/admin/tickets"],
     queryFn: async () => {
-      const response = await fetch("/api/admin/tickets", {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch tickets");
+      try {
+        const response = await apiRequest("GET", "/api/admin/tickets");
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `API error: ${response.status}`);
+        }
+
+        return response.json();
+      } catch (error) {
+        const errorMessage = (error as Error).message || "Failed to fetch tickets";
+        setApiErrors(prev => ({ ...prev, tickets: errorMessage }));
+        console.error("Error fetching tickets:", error);
+        throw error;
       }
-      
-      return response.json() as Promise<AdminTicket[]>;
     },
+    retry: 1,
   });
 
-  // Fetch all servers
-  const { data: servers = [], isLoading: serversLoading } = useQuery({
+  // Fetch all servers with improved error handling
+  const { data: servers = [], isLoading: serversLoading, error: serversError } = useQuery({
     queryKey: ["/api/admin/servers"],
     queryFn: async () => {
-      const response = await fetch("/api/admin/servers", {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch servers");
+      try {
+        const response = await apiRequest("GET", "/api/admin/servers");
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `API error: ${response.status}`);
+        }
+
+        return response.json();
+      } catch (error) {
+        const errorMessage = (error as Error).message || "Failed to fetch servers";
+        setApiErrors(prev => ({ ...prev, servers: errorMessage }));
+        console.error("Error fetching servers:", error);
+        throw error;
       }
-      
-      return response.json() as Promise<AdminServer[]>;
     },
+    retry: 1,
   });
 
   // Update ticket status mutation
@@ -183,11 +198,11 @@ export default function AdminDashboard() {
         credentials: "include",
         body: JSON.stringify({ status, priority }),
       });
-      
+
       if (!response.ok) {
         throw new Error("Failed to update ticket");
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -228,19 +243,252 @@ export default function AdminDashboard() {
   });
 
   // Filter users by search term
-  const filteredUsers = users.filter((user) => 
+  const filteredUsers = users.filter((user) =>
     user.username.toLowerCase().includes(userSearchTerm.toLowerCase())
   );
 
   // Filter tickets by search term
-  const filteredTickets = tickets.filter((ticket) => 
+  const filteredTickets = tickets.filter((ticket) =>
     ticket.subject.toLowerCase().includes(ticketSearchTerm.toLowerCase())
   );
 
   // Filter servers by search term
-  const filteredServers = servers.filter((server) => 
+  const filteredServers = servers.filter((server) =>
     server.name.toLowerCase().includes(serverSearchTerm.toLowerCase())
   );
+
+  // Display errors as toasts when they occur
+  useEffect(() => {
+    if (usersError) {
+      toast({
+        title: "Users Data Error",
+        description: apiErrors.users || "Failed to load user data",
+        variant: "destructive",
+      });
+    }
+    if (ticketsError) {
+      toast({
+        title: "Tickets Data Error",
+        description: apiErrors.tickets || "Failed to load ticket data",
+        variant: "destructive",
+      });
+    }
+    if (serversError) {
+      toast({
+        title: "Servers Data Error",
+        description: apiErrors.servers || "Failed to load server data",
+        variant: "destructive",
+      });
+    }
+  }, [usersError, ticketsError, serversError, toast, apiErrors]);
+
+  // Modify the CardContent sections to show errors if present
+  const renderUserContent = () => {
+    if (usersLoading) {
+      return <div className="text-center py-4">Loading users...</div>;
+    }
+
+    if (usersError) {
+      return <div className="text-center py-4 text-red-500">Error loading users: {apiErrors.users}</div>;
+    }
+
+    return (
+      <Table>
+        <TableCaption>List of all registered users</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead>ID</TableHead>
+            <TableHead>Username</TableHead>
+            <TableHead>Balance</TableHead>
+            <TableHead>Admin</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredUsers.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center">No users found</TableCell>
+            </TableRow>
+          ) : (
+            filteredUsers.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>{user.id}</TableCell>
+                <TableCell>{user.username}</TableCell>
+                <TableCell>${(user.balance / 100).toFixed(2)}</TableCell>
+                <TableCell>
+                  {user.isAdmin ? (
+                    <Badge variant="default">Admin</Badge>
+                  ) : (
+                    <Badge variant="outline">User</Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Button size="sm" variant="outline">
+                    View Details
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    );
+  };
+
+  const renderTicketContent = () => {
+    if (ticketsLoading) {
+      return <div className="text-center py-4">Loading tickets...</div>;
+    }
+
+    if (ticketsError) {
+      return <div className="text-center py-4 text-red-500">Error loading tickets: {apiErrors.tickets}</div>;
+    }
+
+    return (
+      <Table>
+        <TableCaption>List of all support tickets</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead>ID</TableHead>
+            <TableHead>Subject</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Priority</TableHead>
+            <TableHead>User</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredTickets.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center">No tickets found</TableCell>
+            </TableRow>
+          ) : (
+            filteredTickets.map((ticket) => (
+              <TableRow key={ticket.id}>
+                <TableCell>{ticket.id}</TableCell>
+                <TableCell>{ticket.subject}</TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      ticket.status === "open"
+                        ? "default"
+                        : ticket.status === "pending"
+                          ? "secondary"
+                          : "outline"
+                    }
+                  >
+                    {ticket.status}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      ticket.priority === "high"
+                        ? "destructive"
+                        : ticket.priority === "normal"
+                          ? "default"
+                          : "outline"
+                    }
+                  >
+                    {ticket.priority}
+                  </Badge>
+                </TableCell>
+                <TableCell>{ticket.userId}</TableCell>
+                <TableCell className="space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const newStatus = ticket.status === "open" ? "closed" : "open";
+                      updateTicketMutation.mutate({ id: ticket.id, status: newStatus });
+                    }}
+                  >
+                    {ticket.status === "open" ? "Close" : "Reopen"}
+                  </Button>
+                  <Button size="sm" variant="default">
+                    View
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => {
+                      if (confirm(`Are you sure you want to delete ticket #${ticket.id}? This action cannot be undone.`)) {
+                        deleteTicketMutation.mutate(ticket.id);
+                      }
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    );
+  };
+
+  const renderServerContent = () => {
+    if (serversLoading) {
+      return <div className="text-center py-4">Loading servers...</div>;
+    }
+
+    if (serversError) {
+      return <div className="text-center py-4 text-red-500">Error loading servers: {apiErrors.servers}</div>;
+    }
+
+    return (
+      <Table>
+        <TableCaption>List of all provisioned servers</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead>ID</TableHead>
+            <TableHead>Name</TableHead>
+            <TableHead>Region</TableHead>
+            <TableHead>Size</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>User</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredServers.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center">No servers found</TableCell>
+            </TableRow>
+          ) : (
+            filteredServers.map((server) => (
+              <TableRow key={server.id}>
+                <TableCell>{server.id}</TableCell>
+                <TableCell>{server.name}</TableCell>
+                <TableCell>{server.region}</TableCell>
+                <TableCell>{server.size}</TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      server.status === "active"
+                        ? "default"
+                        : server.status === "new"
+                          ? "secondary"
+                          : "outline"
+                    }
+                  >
+                    {server.status}
+                  </Badge>
+                </TableCell>
+                <TableCell>{server.userId}</TableCell>
+                <TableCell>
+                  <Button size="sm" variant="outline">
+                    View Details
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    );
+  };
 
   return (
     <div className="container py-6">
@@ -254,7 +502,7 @@ export default function AdminDashboard() {
           </Link>
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <Timer className="h-4 w-4 text-muted-foreground" />
           <Select
@@ -287,7 +535,7 @@ export default function AdminDashboard() {
               <SelectItem value="15">Every 15 minutes</SelectItem>
             </SelectContent>
           </Select>
-          
+
           {autoRefreshInterval && (
             <Button
               variant="outline"
@@ -305,7 +553,7 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
-      
+
       <Tabs defaultValue="users" className="w-full" onValueChange={handleTabChange}>
         <TabsList className="mb-4">
           <TabsTrigger value="users">
@@ -330,15 +578,15 @@ export default function AdminDashboard() {
               <CardDescription>View and manage all users in the system</CardDescription>
               <div className="flex items-center mt-2">
                 <Search className="mr-2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search users..." 
+                <Input
+                  placeholder="Search users..."
                   value={userSearchTerm}
                   onChange={(e) => setUserSearchTerm(e.target.value)}
                   className="max-w-sm"
                 />
-                <Button 
-                  variant="outline" 
-                  size="icon" 
+                <Button
+                  variant="outline"
+                  size="icon"
                   className="ml-2"
                   onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] })}
                 >
@@ -347,49 +595,7 @@ export default function AdminDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              {usersLoading ? (
-                <div className="text-center py-4">Loading users...</div>
-              ) : (
-                <Table>
-                  <TableCaption>List of all registered users</TableCaption>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ID</TableHead>
-                      <TableHead>Username</TableHead>
-                      <TableHead>Balance</TableHead>
-                      <TableHead>Admin</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center">No users found</TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredUsers.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell>{user.id}</TableCell>
-                          <TableCell>{user.username}</TableCell>
-                          <TableCell>${(user.balance / 100).toFixed(2)}</TableCell>
-                          <TableCell>
-                            {user.isAdmin ? (
-                              <Badge variant="default">Admin</Badge>
-                            ) : (
-                              <Badge variant="outline">User</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="outline">
-                              View Details
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              )}
+              {renderUserContent()}
             </CardContent>
           </Card>
         </TabsContent>
@@ -402,15 +608,15 @@ export default function AdminDashboard() {
               <CardDescription>Handle customer support requests</CardDescription>
               <div className="flex items-center mt-2">
                 <Search className="mr-2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search tickets..." 
+                <Input
+                  placeholder="Search tickets..."
                   value={ticketSearchTerm}
                   onChange={(e) => setTicketSearchTerm(e.target.value)}
                   className="max-w-sm"
                 />
-                <Button 
-                  variant="outline" 
-                  size="icon" 
+                <Button
+                  variant="outline"
+                  size="icon"
                   className="ml-2"
                   onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/tickets"] })}
                 >
@@ -419,90 +625,7 @@ export default function AdminDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              {ticketsLoading ? (
-                <div className="text-center py-4">Loading tickets...</div>
-              ) : (
-                <Table>
-                  <TableCaption>List of all support tickets</TableCaption>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ID</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredTickets.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center">No tickets found</TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredTickets.map((ticket) => (
-                        <TableRow key={ticket.id}>
-                          <TableCell>{ticket.id}</TableCell>
-                          <TableCell>{ticket.subject}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                ticket.status === "open"
-                                  ? "default"
-                                  : ticket.status === "pending"
-                                  ? "secondary"
-                                  : "outline"
-                              }
-                            >
-                              {ticket.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                ticket.priority === "high"
-                                  ? "destructive"
-                                  : ticket.priority === "normal"
-                                  ? "default"
-                                  : "outline"
-                              }
-                            >
-                              {ticket.priority}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{ticket.userId}</TableCell>
-                          <TableCell className="space-x-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => {
-                                const newStatus = ticket.status === "open" ? "closed" : "open";
-                                updateTicketMutation.mutate({ id: ticket.id, status: newStatus });
-                              }}
-                            >
-                              {ticket.status === "open" ? "Close" : "Reopen"}
-                            </Button>
-                            <Button size="sm" variant="default">
-                              View
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="destructive"
-                              onClick={() => {
-                                if (confirm(`Are you sure you want to delete ticket #${ticket.id}? This action cannot be undone.`)) {
-                                  deleteTicketMutation.mutate(ticket.id);
-                                }
-                              }}
-                            >
-                              Delete
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              )}
+              {renderTicketContent()}
             </CardContent>
           </Card>
         </TabsContent>
@@ -515,15 +638,15 @@ export default function AdminDashboard() {
               <CardDescription>Monitor all provisioned servers</CardDescription>
               <div className="flex items-center mt-2">
                 <Search className="mr-2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search servers..." 
+                <Input
+                  placeholder="Search servers..."
                   value={serverSearchTerm}
                   onChange={(e) => setServerSearchTerm(e.target.value)}
                   className="max-w-sm"
                 />
-                <Button 
-                  variant="outline" 
-                  size="icon" 
+                <Button
+                  variant="outline"
+                  size="icon"
                   className="ml-2"
                   onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/servers"] })}
                 >
@@ -532,59 +655,7 @@ export default function AdminDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              {serversLoading ? (
-                <div className="text-center py-4">Loading servers...</div>
-              ) : (
-                <Table>
-                  <TableCaption>List of all provisioned servers</TableCaption>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ID</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Region</TableHead>
-                      <TableHead>Size</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredServers.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center">No servers found</TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredServers.map((server) => (
-                        <TableRow key={server.id}>
-                          <TableCell>{server.id}</TableCell>
-                          <TableCell>{server.name}</TableCell>
-                          <TableCell>{server.region}</TableCell>
-                          <TableCell>{server.size}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                server.status === "active"
-                                  ? "default"
-                                  : server.status === "new"
-                                  ? "secondary"
-                                  : "outline"
-                              }
-                            >
-                              {server.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{server.userId}</TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="outline">
-                              View Details
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              )}
+              {renderServerContent()}
             </CardContent>
           </Card>
         </TabsContent>
