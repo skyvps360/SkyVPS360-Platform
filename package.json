@@ -30,7 +30,8 @@
     "ensure-client-schema": "node ./scripts/ensure-client-schema.mjs",
     "build:production": "npm run fix-schema-imports && cross-env NODE_ENV=production npm run build",
     "fix-schema-types": "node scripts/fix-schema-types.mjs",
-    "clean-dev": "bash ./clean-restart.sh"
+    "clean-dev": "bash ./clean-restart.sh",
+    "start:prod": "bash ./start.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

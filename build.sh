@@ -1,8 +1,20 @@
 #!/bin/bash
-# Build script for DigitalOcean App Platform
+set -e
+
+echo "🔨 Starting build process..."
+
+# Install dependencies
+npm ci --only=production
 
 # Build the app
-npm run build
+echo "📦 Building application..."
+NODE_ENV=production npm run build
 
-# Skip database migration in build process
-# We'll handle migrations separately in the app
+# Create required directories
+mkdir -p dist/migrations
+
+# Copy migration files
+echo "📋 Copying migrations..."
+cp -r migrations/*.js dist/migrations/
+
+echo "✅ Build completed successfully!"

@@ -1,3 +1,26 @@
-health_check:
-  http_path: /
-  port: 5000
+name: skyvps360
+region: tor
+services:
+- environment_slug: node-js
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: skyvps360/SkyVPS360-Platform
+  http_port: 5000
+  instance_count: 1
+  instance_size_slug: basic-xs
+  name: skyvps360-web
+  routes:
+  - path: /
+  build_command: npm install
+  run_command: npm run dev
+  source_dir: /
+  envs:
+  - key: NODE_ENV
+    scope: RUN_AND_BUILD_TIME
+    value: development
+  - key: PORT
+    scope: RUN_AND_BUILD_TIME
+    value: "5000"
+  health_check:
+    http_path: /health
