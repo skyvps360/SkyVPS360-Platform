@@ -21,6 +21,7 @@
     "start:dev": "cross-env NODE_ENV=development node dist/server/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
+    "db:push:force": "drizzle-kit push --accept-data-loss",
     "db:migrate": "node scripts/run-migrations.mjs",
     "postinstall": "if [ \"$NODE_ENV\" != \"development\" ]; then npm run db:push || true; fi",
     "find-schema-imports": "node scripts/find-schema-imports.mjs",
