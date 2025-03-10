@@ -37,7 +37,7 @@ export default defineConfig({
     extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json']
   },
   // Use client directory as root
-  root: path.resolve(__dirname, "client"),
+  root: 'client',
   build: {
     outDir: path.resolve(__dirname, "dist/client"),
     emptyOutDir: true,
@@ -87,10 +87,14 @@ export default defineConfig({
     usePolling: false,
     ignored: ['**/node_modules/**', '**/dist/**']
   },
-  proxy: {
-    '/api': {
-      target: 'http://localhost:5000',
-      changeOrigin: true,
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  publicDir: 'public',
+  server: {
+    proxy: {
+      '/api': 'http://localhost:5000',
+      '/auth': 'http://localhost:5000'
     }
   },
   // Prevent caching issues
