@@ -93,7 +93,6 @@ export default defineConfig({
         changeOrigin: true,
       }
     },
-  },
   // Prevent caching issues
   cacheDir: path.resolve(__dirname, 'node_modules/.vite_clean'),
   clearScreen: false,
