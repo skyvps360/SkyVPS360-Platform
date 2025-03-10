@@ -1,1 +1,1 @@
-web: set -a; source .env; set +a && npm run dev
+web: npm run db:push && npm run start:prod
