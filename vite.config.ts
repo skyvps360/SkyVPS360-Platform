@@ -86,20 +86,5 @@ export default defineConfig({
   watch: {
     usePolling: false,
     ignored: ['**/node_modules/**', '**/dist/**']
-  },
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  publicDir: 'public',
-  server: {
-    proxy: {
-      '/api': 'http://localhost:5000',
-      '/auth': 'http://localhost:5000'
-    }
-  },
-  // Prevent caching issues
-  cacheDir: path.resolve(__dirname, 'node_modules/.vite_clean'),
-  clearScreen: false,
-  // Enable detailed logging
-  logLevel: 'info',
-})
+  }
+});
