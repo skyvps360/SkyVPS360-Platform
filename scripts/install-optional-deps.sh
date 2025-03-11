@@ -1,14 +1,13 @@
 #!/bin/bash
-# Script to install optional dependencies required for the build process
 
 echo "Installing optional dependencies..."
 
-# Check if terser is installed
-if ! npm list terser --depth=0 | grep -q terser; then
-    echo "Installing terser for minification..."
-    npm install --save-dev terser
+if [ "$NODE_ENV" = "production" ]; then
+  echo "Installing production build dependencies..."
+  npm install --no-save @vitejs/plugin-react @replit/vite-plugin-cartographer @replit/vite-plugin-runtime-error-modal @replit/vite-plugin-shadcn-theme-json esbuild tailwindcss autoprefixer postcss terser
 else
-    echo "✅ Terser already installed"
+  echo "Installing terser for minification..."
+  npm install --no-save terser
 fi
 
 echo "Optional dependencies check completed"
