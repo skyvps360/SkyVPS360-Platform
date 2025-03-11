@@ -31,7 +31,8 @@
     "build:production": "npm run fix-schema-imports && cross-env NODE_ENV=production npm run build",
     "fix-schema-types": "node scripts/fix-schema-types.mjs",
     "clean-dev": "bash ./clean-restart.sh",
-    "start:prod": "bash ./start.sh"
+    "start:prod": "bash ./start.sh",
+    "build:digitalocean": "npm install @vitejs/plugin-react @replit/vite-plugin-cartographer @replit/vite-plugin-runtime-error-modal @replit/vite-plugin-shadcn-theme-json esbuild tailwindcss autoprefixer postcss && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

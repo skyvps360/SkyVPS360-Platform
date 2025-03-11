@@ -6,21 +6,22 @@ services:
     branch: main
     deploy_on_push: true
     repo: skyvps360/SkyVPS360-Platform
-  http_port: 5000
+  http_port: 8080
   instance_count: 1
   instance_size_slug: basic-xs
   name: skyvps360-web
   routes:
   - path: /
-  build_command: npm install
-  run_command: npm run dev
+  build_command: ./digitalocean-build.sh
+  run_command: npm run start:prod
   source_dir: /
   envs:
   - key: NODE_ENV
     scope: RUN_AND_BUILD_TIME
-    value: development
+    value: production
   - key: PORT
     scope: RUN_AND_BUILD_TIME
-    value: "5000"
+    value: "8080"
   health_check:
-    http_path: /health
+    http_path: /
+    initial_delay_seconds: 20
