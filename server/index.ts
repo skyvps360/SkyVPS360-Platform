@@ -106,12 +106,24 @@ app.use((req, res, next) => {
     // You can add specific additional domains here
   ];
 
-  // Set CORS headers - more permissive approach
-  const allowOrigin = process.env.NODE_ENV === 'development'
-    ? origin  // Allow any origin in development
-    : allowedDomains.includes(new URL(origin).hostname)
-      ? origin
-      : 'https://skyvps360.xyz';
+  // Set CORS headers with proper error handling for invalid origins
+  let allowOrigin = 'https://skyvps360.xyz'; // Default fallback
+
+  if (process.env.NODE_ENV === 'development') {
+    // In development, allow any origin
+    allowOrigin = origin || allowOrigin;
+  } else if (origin) {
+    // In production, validate the origin before using it
+    try {
+      const url = new URL(origin);
+      if (allowedDomains.includes(url.hostname)) {
+        allowOrigin = origin;
+      }
+    } catch (err) {
+      logger.error('Invalid origin URL:', origin);
+      // Keep using the default allowOrigin
+    }
+  }
 
   res.header('Access-Control-Allow-Origin', allowOrigin);
   res.header('Access-Control-Allow-Credentials', 'true');
