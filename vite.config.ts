@@ -39,6 +39,14 @@ export default defineConfig(async () => {
 
   return {
     plugins,
+    // Add server configuration with allowedHosts
+    server: {
+      host: true, // Listen on all addresses
+      allowedHosts: ['skyvps360.xyz'], // Add your domain here
+      hmr: {
+        overlay: false, // Disable the error overlay
+      }
+    },
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./client/src"),
@@ -96,7 +104,7 @@ export default defineConfig(async () => {
     define: {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
       'import.meta.env.BASE_URL': JSON.stringify('/'),
-      'import.meta.env.VITE_DOMAIN': JSON.stringify(process.env.DOMAIN || 'https://skyvps360.xyz')
+      'import.meta.env.VITE_DOMAIN': JSON.stringify(process.env.DOMAIN || 'https://skyvps360.xyz/')
     },
     // Make sure it watches the right files
     watch: {
