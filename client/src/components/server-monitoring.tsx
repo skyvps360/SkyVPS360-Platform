@@ -125,7 +125,7 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
   // Force refresh metrics 
   const { mutate: refreshServerMetrics, isPending: isRefreshing } = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/api/servers/${serverId}/metrics/refresh`, 'POST');
+      return await apiRequest('POST', `/api/servers/${serverId}/metrics/refresh`);
     },
     onSuccess: (data) => {
       toast({
