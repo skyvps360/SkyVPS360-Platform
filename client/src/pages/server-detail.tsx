@@ -346,73 +346,41 @@ function ActiveFirewallRules({ serverId }: { serverId: number }) {
 }
 
 // Map regions to flag emojis
-const regionFlags: { [key: string]: string } = {
-  nyc1: "🇺🇸 New York",
-  nyc2: "🇺🇸 New York",
-  nyc3: "🇺🇸 New York",
-  sfo3: "🇺🇸 San Francisco",
-  sfo2: "🇺🇸 San Francisco",
-  ams3: "🇳🇱 Amsterdam",
-  sgp1: "🇸🇬 Singapore",
-  lon1: "🇬🇧 London",
-  tor1: "🇨🇦 Toronto",
-  blr1: "🇮🇳 Bangalore",
-  syd1: "🇦🇺 Sydney",
+const regionFlags = {
+  nyc1: "🇺🇸 New York 1",
+  nyc2: "🇺🇸 New York 2",
+  sgp1: "🇸🇬 Singapore 1",
+  lon1: "🇬🇧 London 1",
+  nyc3: "🇺🇸 New York 3",
+  ams3: "🇳🇱 Amsterdam 3",
+  fra1: "🇩🇪 Frankfurt 1",
+  tor1: "🇨🇦 Toronto 1",
+  sfo2: "🇺🇸 San Francisco 2",
+  blr1: "🇮🇳 Bangalore 1",
+  sfo3: "🇺🇸 San Francisco 3",
+  syd1: "🇦🇺 Sydney 1"
 };
 
-// Schema already defined above
+// Add function to get OS display name
+const getOSDisplayName = (application: string | null) => {
+  if (!application) return "Ubuntu 22.04";
+  const appParts = application.split(" on ");
+  if (appParts.length > 1) {
+    return appParts[0];
+  }
+  return application;
+};
+
+// Form for disabling firewall with confirmation text
+const disableFirewallForm = useForm<ConfirmFirewallDisableFormValues>({
+  resolver: zodResolver(confirmFirewallDisableSchema),
+  defaultValues: {
+    confirmationText: "",
+  },
+});
 
 export default function ServerDetailPage() {
-  // Extract and validate params - simplified approach for better compatibility
-  const params = useParams<{ id: string }>();
-  const pathId = params?.id;
-
-  // Form for disabling firewall with confirmation text
-  const disableFirewallForm = useForm<ConfirmFirewallDisableFormValues>({
-    resolver: zodResolver(confirmFirewallDisableSchema),
-    defaultValues: {
-      confirmationText: "" as any,
-    },
-  });
-
-  // Debug info
-  console.log("ServerDetailPage Params:", params);
-  console.log("Path ID:", pathId);
-  console.log("URL Path:", window.location.pathname);
-
-  // Parse the server ID from the URL
-  let serverId: number = -1;
-
-  if (pathId) {
-    try {
-      // Parse the server ID
-      serverId = parseInt(pathId);
-
-      // If we get an invalid ID, show an error
-      if (isNaN(serverId) || serverId <= 0) {
-        console.error("Invalid server ID in URL:", pathId);
-        serverId = -1; // Use an invalid ID that will be caught by the error handling
-      } else {
-        console.log("Valid server ID found:", serverId);
-      }
-    } catch (err) {
-      console.error("Error parsing server ID:", err);
-      serverId = -1;
-    }
-  } else {
-    // As a fallback, try to extract ID from URL pathname
-    const pathMatch = window.location.pathname.match(/\/servers\/(\d+)/);
-    if (pathMatch && pathMatch[1]) {
-      try {
-        serverId = parseInt(pathMatch[1]);
-        console.log("Extracted server ID from URL path:", serverId);
-      } catch (e) {
-        console.error("Failed to parse ID from URL path");
-      }
-    } else {
-      console.error("No server ID provided in URL");
-    }
-  }
+  const { pathId } = useParams();
   const { user, refetchUser } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -420,6 +388,25 @@ export default function ServerDetailPage() {
   const [newPassword, setNewPassword] = useState("");
   const [ipv6Enabled, setIpv6Enabled] = useState(false);
   const [confirmIpv6Enable, setConfirmIpv6Enable] = useState(false);
+
+  // Debug info
+  console.log("ServerDetailPage Params:", pathId);
+  console.log("URL Path:", window.location.pathname);
+
+  // Parse the server ID from the URL
+  let serverId: number = -1;
+  if (pathId) {
+    try {
+      serverId = parseInt(pathId);
+      if (isNaN(serverId) || serverId <= 0) {
+        console.error("Invalid server ID in URL:", pathId);
+        serverId = -1;
+      }
+    } catch (err) {
+      console.error("Error parsing server ID:", err);
+      serverId = -1;
+    }
+  }
 
   // Parse URL to check for tab query parameter
   const searchParams = new URLSearchParams(window.location.search);
@@ -1044,9 +1031,9 @@ export default function ServerDetailPage() {
                             <code className="bg-muted px-2 py-1 rounded text-sm">
                               {server.ipAddress
                                 ? server.ipAddress
-                                    .split(".")
-                                    .slice(0, 3)
-                                    .join(".") + ".1"
+                                  .split(".")
+                                  .slice(0, 3)
+                                  .join(".") + ".1"
                                 : "Unavailable"}
                             </code>
                           </div>
@@ -1406,219 +1393,214 @@ export default function ServerDetailPage() {
                       </Dialog>
                     </div>
                   </div>
-
                   {/* Active rules section - simplified display */}
                   <div className="space-y-3">
                     {/* Fetch and display actual rules from API */}
                     <ActiveFirewallRules serverId={serverId} />
                   </div>
-
                   <p className="text-xs text-muted-foreground mt-4">
                     First, enable the firewall by clicking "Enable Firewall",
                     then use "Manage Firewall Rules" to add protection rules for
                     your server. The firewall starts with no rules by default.
                   </p>
                 </div>
-              </div>
             </CardContent>
           </Card>
-        </TabsContent>
+          {/* Metrics Tab */}
+          <TabsContent value="metrics">
+            <div className="grid grid-cols-1 gap-6">
+              {/* Server Performance Metrics */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Performance Metrics</CardTitle>
+                  <CardDescription>
+                    Monitor your server's resource usage and performance
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ServerMonitoring serverId={serverId} />
+                </CardContent>
+              </Card>
 
-        {/* Metrics Tab */}
-        <TabsContent value="metrics">
-          <div className="grid grid-cols-1 gap-6">
-            {/* Server Performance Metrics */}
+              {/* Network Performance & Bandwidth Monitoring */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Network Performance</CardTitle>
+                  <CardDescription>
+                    Network throughput and bandwidth usage
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Network Performance Info */}
+                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3">
+                    <p className="font-medium text-blue-800 dark:text-blue-300 mb-1">
+                      Network Throughput
+                    </p>
+                    <p className="text-blue-600 dark:text-blue-400">
+                      Your server includes{" "}
+                      {server.size.includes("g-") ? "1Gbps" : "500Mbps"} network
+                      throughput. Outbound data transfer is limited to{" "}
+                      {server.specs?.disk
+                        ? Math.max(1, Math.floor(server.specs.disk / 25))
+                        : 1}
+                      TB per month.
+                    </p>
+                  </div>
+
+                  {/* Network Usage Monitoring */}
+                  <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-md p-4">
+                    <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-2">
+                      Bandwidth Monitoring
+                    </h3>
+                    <NetworkUsage serverId={serverId} size={server.size} />
+                  </div>
+
+                  {/* Bandwidth Details Link */}
+                  <div className="flex justify-end">
+                    <Link href={`/servers/${serverId}/bandwidth-details`}>
+                      <Button variant="outline" size="sm">
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        View Detailed Bandwidth Analytics
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Console Tab */}
+          <TabsContent value="console">
             <Card>
               <CardHeader>
-                <CardTitle>Performance Metrics</CardTitle>
+                <CardTitle>Server Console</CardTitle>
                 <CardDescription>
-                  Monitor your server's resource usage and performance
+                  Access your server's command line interface
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ServerMonitoring serverId={serverId} />
-              </CardContent>
-            </Card>
+                {/* CloudRack Terminal Notice */}
+                <CloudRackTerminalNotice />
 
-            {/* Network Performance & Bandwidth Monitoring */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Network Performance</CardTitle>
-                <CardDescription>
-                  Network throughput and bandwidth usage
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Network Performance Info */}
-                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3">
-                  <p className="font-medium text-blue-800 dark:text-blue-300 mb-1">
-                    Network Throughput
+                {/* Server Access Section - Password Authentication */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium mb-2">Remote Access</h3>
+                  <p className="text-sm mb-4">
+                    Connect to your server using SSH with password authentication:
                   </p>
-                  <p className="text-blue-600 dark:text-blue-400">
-                    Your server includes{" "}
-                    {server.size.includes("g-") ? "1Gbps" : "500Mbps"} network
-                    throughput. Outbound data transfer is limited to{" "}
-                    {server.specs?.disk
-                      ? Math.max(1, Math.floor(server.specs.disk / 25))
-                      : 1}
-                    TB per month.
-                  </p>
-                </div>
-
-                {/* Network Usage Monitoring */}
-                <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-md p-4">
-                  <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-2">
-                    Bandwidth Monitoring
-                  </h3>
-                  <NetworkUsage serverId={serverId} size={server.size} />
-                </div>
-
-                {/* Bandwidth Details Link */}
-                <div className="flex justify-end">
-                  <Link href={`/servers/${serverId}/bandwidth-details`}>
-                    <Button variant="outline" size="sm">
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      View Detailed Bandwidth Analytics
+                  <div className="bg-muted p-3 rounded-md font-mono text-sm flex justify-between items-center">
+                    <code>ssh root@{server.ipAddress}</code>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `ssh root@${server.ipAddress}`,
+                        );
+                        toast({
+                          title: "Copied",
+                          description: "SSH command copied to clipboard",
+                        });
+                      }}
+                    >
+                      <CopyPlus className="h-4 w-4" />
                     </Button>
-                  </Link>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    You will be prompted for the root password you set during
+                    server creation.
+                  </p>
+
+                  {/* Password Authentication */}
+                  <div className="mt-4">
+                    <div className="bg-card border rounded-md p-4">
+                      <h4 className="text-sm font-medium mb-2">
+                        Password Authentication
+                      </h4>
+
+                      <p className="text-xs text-muted-foreground mb-2">
+                        {isEditingPassword
+                          ? "Enter a new root password for your server."
+                          : "Your root password is used to access your server via SSH or the web terminal. Keep it secure."}
+                      </p>
+
+                      {isEditingPassword ? (
+                        <div className="flex items-center gap-2 mt-3">
+                          <Input
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="New password"
+                            className="w-48"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              updatePasswordMutation.mutate(newPassword)
+                            }
+                            disabled={
+                              updatePasswordMutation.isPending || !newPassword
+                            }
+                          >
+                            <Save className="h-4 w-4 mr-2" />
+                            Save
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setIsEditingPassword(false);
+                              setNewPassword("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsEditingPassword(true)}
+                        >
+                          <Lock className="h-4 w-4 mr-2" />
+                          {server.rootPassUpdated
+                            ? "Change Password"
+                            : "Set Root Password"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Terminal Section */}
+                <div className="mt-8 border-t pt-6">
+                  <h3 className="text-lg font-medium mb-4">
+                    Interactive Terminal
+                  </h3>
+
+                  <div className="bg-muted/50 rounded-md p-3 mb-4">
+                    <div className="flex items-center text-amber-600">
+                      <Terminal className="h-4 w-4 mr-2" />
+                      <span className="text-sm font-medium">Terminal Access</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This terminal uses secure password authentication with your
+                      root password. Full Linux command support with no external
+                      clients needed.
+                    </p>
+                  </div>
+
+                  <div className="w-full">
+                    <ServerTerminal
+                      serverId={server.id}
+                      serverName={server.name}
+                      ipAddress={server.ipAddress || "unknown"}
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          </div>
-        </TabsContent>
-
-        {/* Console Tab */}
-        <TabsContent value="console">
-          <Card>
-            <CardHeader>
-              <CardTitle>Server Console</CardTitle>
-              <CardDescription>
-                Access your server's command line interface
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* CloudRack Terminal Notice */}
-              <CloudRackTerminalNotice />
-
-              {/* Server Access Section - Password Authentication */}
-              <div className="mb-6">
-                <h3 className="text-lg font-medium mb-2">Remote Access</h3>
-                <p className="text-sm mb-4">
-                  Connect to your server using SSH with password authentication:
-                </p>
-                <div className="bg-muted p-3 rounded-md font-mono text-sm flex justify-between items-center">
-                  <code>ssh root@{server.ipAddress}</code>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      navigator.clipboard.writeText(
-                        `ssh root@${server.ipAddress}`,
-                      );
-                      toast({
-                        title: "Copied",
-                        description: "SSH command copied to clipboard",
-                      });
-                    }}
-                  >
-                    <CopyPlus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  You will be prompted for the root password you set during
-                  server creation.
-                </p>
-
-                {/* Password Authentication */}
-                <div className="mt-4">
-                  <div className="bg-card border rounded-md p-4">
-                    <h4 className="text-sm font-medium mb-2">
-                      Password Authentication
-                    </h4>
-
-                    <p className="text-xs text-muted-foreground mb-2">
-                      {isEditingPassword
-                        ? "Enter a new root password for your server."
-                        : "Your root password is used to access your server via SSH or the web terminal. Keep it secure."}
-                    </p>
-
-                    {isEditingPassword ? (
-                      <div className="flex items-center gap-2 mt-3">
-                        <Input
-                          type="password"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="New password"
-                          className="w-48"
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            updatePasswordMutation.mutate(newPassword)
-                          }
-                          disabled={
-                            updatePasswordMutation.isPending || !newPassword
-                          }
-                        >
-                          <Save className="h-4 w-4 mr-2" />
-                          Save
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setIsEditingPassword(false);
-                            setNewPassword("");
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsEditingPassword(true)}
-                      >
-                        <Lock className="h-4 w-4 mr-2" />
-                        {server.rootPassUpdated
-                          ? "Change Password"
-                          : "Set Root Password"}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Terminal Section */}
-              <div className="mt-8 border-t pt-6">
-                <h3 className="text-lg font-medium mb-4">
-                  Interactive Terminal
-                </h3>
-
-                <div className="bg-muted/50 rounded-md p-3 mb-4">
-                  <div className="flex items-center text-amber-600">
-                    <Terminal className="h-4 w-4 mr-2" />
-                    <span className="text-sm font-medium">Terminal Access</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This terminal uses secure password authentication with your
-                    root password. Full Linux command support with no external
-                    clients needed.
-                  </p>
-                </div>
-
-                <div className="w-full">
-                  <ServerTerminal
-                    serverId={server.id}
-                    serverName={server.name}
-                    ipAddress={server.ipAddress || "unknown"}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          </TabsContent>
       </Tabs>
     </div>
   );

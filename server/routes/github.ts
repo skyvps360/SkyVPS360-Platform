@@ -14,49 +14,56 @@ router.use("/repos", requireAuth);
 router.use("/auth-url", requireAuth);
 router.use("/disconnect", requireAuth);
 
-// Routes
+// Get GitHub repositories
 router.get("/repos", async (req, res) => {
   try {
-    const githubToken = req.user.githubToken;
-
-    if (!githubToken) {
-      return res.status(401).json({ error: "GitHub account not connected" });
+    // Check if user has GitHub token
+    if (!req.user.githubToken) {
+      return res.status(401).json({ 
+        error: "GitHub account not connected",
+        code: "github_not_connected"
+      });
     }
 
-    const repos = await getUserRepositories(githubToken);
+    const repos = await getUserRepositories(req.user.githubToken);
     res.json(repos);
   } catch (error) {
-    console.error("GitHub repositories fetch error:", error);
+    logger.error("GitHub repositories fetch error:", error);
+    
+    // Check if token is invalid
+    if (error.status === 401) {
+      // Clear invalid token
+      await saveGitHubToken(req.user.id, null);
+      return res.status(401).json({
+        error: "GitHub token is invalid. Please reconnect your account.",
+        code: "github_token_invalid"
+      });
+    }
+
     res.status(500).json({ error: error.message });
   }
 });
 
-// Get GitHub OAuth URL - Modified to support both redirect and JSON response
+// Get GitHub OAuth URL
 router.get("/auth-url", async (req, res) => {
   try {
     const clientId = process.env.GITHUB_CLIENT_ID?.trim();
     const redirectUri = process.env.GITHUB_REDIRECT_URI?.trim();
 
-    // Check if the request wants JSON response instead of redirect
-    const wantJson = req.query.json === 'true';
-
     if (!clientId || !redirectUri) {
       return res.status(500).json({ error: "GitHub OAuth configuration is missing" });
     }
 
-    // Generate the GitHub OAuth URL
+    // Generate the GitHub OAuth URL with necessary scopes
     const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=repo,user:email`;
 
-    // Log the URL for debugging
-    logger.info(`🐙 [GitHub] GitHub OAuth URL generated: ${authUrl}`);
-
-    // If JSON response is requested, return the URL as JSON
-    if (wantJson) {
+    // Check if JSON response is requested
+    if (req.query.json === 'true') {
       return res.json({ url: authUrl });
     }
 
-    // Otherwise, redirect directly to GitHub (this is now the default behavior)
-    return res.redirect(authUrl);
+    // Otherwise redirect to GitHub
+    res.redirect(authUrl);
   } catch (error) {
     logger.error("Error generating GitHub auth URL:", error);
     res.status(500).json({ error: "Failed to generate GitHub auth URL" });
@@ -67,77 +74,34 @@ router.get("/auth-url", async (req, res) => {
 router.get("/callback", async (req, res) => {
   try {
     const { code } = req.query;
-    logger.info(`🐙 [GitHub] Received OAuth callback with code: ${code ? code.toString().substring(0, 10) + '...' : 'MISSING'}`);
-
-    if (!code) {
-      return res.status(400).json({ error: "Missing code parameter" });
+    
+    if (!code || !req.user) {
+      return res.status(400).json({ error: "Missing code or not authenticated" });
     }
 
-    // Access environment variables directly
-    const clientId = process.env.GITHUB_CLIENT_ID;
-    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
-    const redirectUri = process.env.GITHUB_REDIRECT_URI;
+    // Exchange code for token
+    const { access_token: accessToken } = await exchangeCodeForToken(code.toString());
 
-    // Log the exact values being used
-    logger.info(`🐙 [GitHub] Using Client ID: ${clientId?.substring(0, 5)}...`);
-    logger.info(`🐙 [GitHub] Using Redirect URI: ${redirectUri}`);
-
-    if (!clientId || !clientSecret || !redirectUri) {
-      return res.status(500).json({ error: "GitHub OAuth configuration is missing" });
+    if (!accessToken) {
+      return res.status(500).json({ error: "Failed to get access token from GitHub" });
     }
 
-    // Exchange code for access token with DETAILED error logging
-    logger.info(`🐙 [GitHub] Sending token request to GitHub with redirect_uri=${redirectUri}`);
-
-    const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-        redirect_uri: redirectUri
-      })
-    });
-
-    const tokenData = await tokenResponse.json();
-
-    // Log FULL error details from GitHub
-    if (tokenData.error) {
-      logger.error(`🐙 [GitHub] GitHub API error: ${tokenData.error}`);
-      logger.error(`🐙 [GitHub] GitHub error description: ${tokenData.error_description}`);
-      logger.error(`🐙 [GitHub] GitHub error URI: ${tokenData.error_uri}`);
-      return res.status(500).json({
-        error: "Failed to obtain access token",
-        github_error: tokenData.error,
-        description: tokenData.error_description
-      });
-    }
-
-    const accessToken = tokenData.access_token;
-    logger.success(`🐙 [GitHub] Successfully obtained access token`);
-
-    // Fetch user information from GitHub
+    // Get user info from GitHub
     const userResponse = await fetch("https://api.github.com/user", {
       headers: {
-        "Authorization": `token ${accessToken}`,
-        "Accept": "application/vnd.github.v3+json"
+        Authorization: `token ${accessToken}`,
+        Accept: "application/vnd.github.v3+json",
+        "User-Agent": "SkyVPS360-Platform"
       }
     });
 
-    const userData = await userResponse.json();
-
-    if (!userData.id) {
-      logger.error(`🐙 [GitHub] Failed to fetch GitHub user data: ${JSON.stringify(userData)}`);
+    if (!userResponse.ok) {
       return res.status(500).json({ error: "Failed to fetch user information from GitHub" });
     }
 
-    logger.success(`🐙 [GitHub] Linked GitHub account: ${userData.login}`);
+    const userData = await userResponse.json();
 
-    // Save GitHub token and user information in the database
+    // Save GitHub info to database
     await db.update(users)
       .set({
         githubToken: accessToken,
@@ -147,11 +111,11 @@ router.get("/callback", async (req, res) => {
       })
       .where(eq(users.id, req.user.id));
 
-    // Redirect with success message
+    // Redirect with success
     res.redirect("/dashboard?github=connected&username=" + userData.login);
   } catch (error) {
     logger.error("Error handling GitHub OAuth callback:", error);
-    res.status(500).json({ error: "Failed to handle GitHub OAuth callback: " + error.message });
+    res.redirect("/dashboard?github=error&message=" + encodeURIComponent(error.message));
   }
 });
 
@@ -161,7 +125,8 @@ router.post("/disconnect", async (req, res) => {
     await saveGitHubToken(req.user.id, null);
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logger.error("Error disconnecting GitHub account:", error);
+    res.status(500).json({ error: "Failed to disconnect GitHub account" });
   }
 });
 

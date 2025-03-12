@@ -2,11 +2,10 @@ import express from "express";
 import { requireAuth } from "../auth";
 import { logger } from "../utils/logger";
 import { db } from "../db";
-import { users } from "@shared/schema";
 import { deployments } from "../db/schema";
 import { eq } from "drizzle-orm";
-import * as githubApi from "../services/github-api";
 import * as digitalOcean from "../services/digital-ocean";
+import * as githubApi from "../services/github";
 
 const router = express.Router();
 
@@ -16,24 +15,14 @@ router.use(requireAuth);
 // Get all deployments for the authenticated user
 router.get("/", async (req, res) => {
   try {
-    logger.info(`Retrieving deployments for user ${req.user.id}`);
+    const userDeployments = await db.select()
+      .from(deployments)
+      .where(eq(deployments.userId, req.user.id))
+      .orderBy(deployments.createdAt, "desc");
 
-    try {
-      // Use safe query that doesn't rely on specific column names
-      // by accessing through db.query.deployments instead of raw select
-      const userDeployments = await db.query.deployments.findMany({
-        where: eq(deployments.userId, req.user.id)
-      });
-
-      logger.info(`Retrieved ${userDeployments.length} deployments for user ${req.user.id}`);
-      res.json(userDeployments);
-    } catch (dbError) {
-      // Fallback to return empty array instead of error
-      logger.warning(`Database schema issue detected, returning empty deployments array: ${dbError.message}`);
-      res.json([]);
-    }
-  } catch (error) {
-    logger.error("Error retrieving deployments:", error);
+    res.json(userDeployments);
+  } catch (dbError) {
+    logger.error("Database error retrieving deployments:", dbError);
     res.status(500).json({ error: "Failed to retrieve deployments" });
   }
 });
@@ -41,7 +30,13 @@ router.get("/", async (req, res) => {
 // Create a new deployment from GitHub repository
 router.post("/", async (req, res) => {
   try {
-    const { repoFullName, branch = "main" } = req.body;
+    const {
+      repoFullName,
+      branch = "main",
+      region = "nyc",
+      environmentVariables = {},
+      size = "basic-xs"
+    } = req.body;
 
     if (!repoFullName) {
       return res.status(400).json({ error: "Repository name is required" });
@@ -56,7 +51,7 @@ router.post("/", async (req, res) => {
       return res.status(401).json({ error: "GitHub account not connected" });
     }
 
-    // Parse repo owner and name from full name (owner/repo)
+    // Parse repo owner and name
     const [owner, repo] = repoFullName.split('/');
 
     if (!owner || !repo) {
@@ -73,25 +68,27 @@ router.post("/", async (req, res) => {
       repositoryOwner: owner,
       branch,
       githubToken,
-      region: req.body.region || "nyc",
-      environmentVariables: req.body.env || {}
+      region,
+      size,
+      environmentVariables
     });
 
     // Store deployment in database
-    const newDeployment = await db.insert(deployments).values({
+    const [newDeployment] = await db.insert(deployments).values({
       userId: req.user.id,
-      repositoryName: repository.name, // Changed from name to repositoryName
+      repository: repoFullName,
       repositoryUrl: repository.html_url,
       branch,
-      status: "in_progress",
+      status: deploymentResult.status || "in_progress",
       deployedAt: new Date().toISOString(),
-      region: req.body.region || "nyc",
+      region,
       doAppId: deploymentResult.app_id?.toString(),
-      deploymentUrl: deploymentResult.live_url || null
+      url: deploymentResult.live_url || null
     }).returning();
 
     logger.success(`Deployment initiated for ${repoFullName} (${branch})`);
-    res.status(201).json(newDeployment[0]);
+    res.status(201).json(newDeployment);
+
   } catch (error) {
     logger.error(`Error deploying repository:`, error);
     res.status(500).json({
@@ -141,53 +138,38 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Redeploy an existing deployment
-router.post("/:id/redeploy", async (req, res) => {
+// Delete deployment
+router.delete("/:id", async (req, res) => {
   try {
-    // Use direct query instead of the query builder
-    const [deployment] = await db.select()
+    const deploymentId = req.params.id;
+
+    const deployment = await db.select()
       .from(deployments)
-      .where(eq(deployments.id, parseInt(req.params.id, 10)))
+      .where(eq(deployments.id, deploymentId))
       .limit(1);
 
-    if (!deployment || deployment.userId !== req.user.id) {
+    if (deployment.length === 0) {
       return res.status(404).json({ error: "Deployment not found" });
     }
 
-    logger.info(`Redeploying deployment ${deployment.id}`);
-
-    // Trigger redeployment using app platform service
-    await appPlatform.redeployApp(deployment);
-
-    res.json({ message: "Deployment is redeploying" });
-  } catch (error) {
-    logger.error(`Error redeploying application: ${error}`);
-    res.status(500).json({ error: "Failed to redeploy application" });
-  }
-});
-
-// Restart an existing deployment
-router.post("/:id/restart", async (req, res) => {
-  try {
-    // Use direct query instead of the query builder
-    const [deployment] = await db.select()
-      .from(deployments)
-      .where(eq(deployments.id, parseInt(req.params.id, 10)))
-      .limit(1);
-
-    if (!deployment || deployment.userId !== req.user.id) {
-      return res.status(404).json({ error: "Deployment not found" });
+    // Check if deployment belongs to user
+    if (deployment[0].userId !== req.user.id) {
+      return res.status(403).json({ error: "You do not have permission to delete this deployment" });
     }
 
-    logger.info(`Restarting deployment ${deployment.id}`);
+    // Delete from DigitalOcean if app ID exists
+    if (deployment[0].doAppId) {
+      await digitalOcean.deleteApp(deployment[0].doAppId);
+    }
 
-    // Trigger restart using app platform service
-    await appPlatform.restartApp(deployment);
+    // Delete from database
+    await db.delete(deployments)
+      .where(eq(deployments.id, deploymentId));
 
-    res.json({ message: "Deployment is restarting" });
+    res.json({ success: true });
   } catch (error) {
-    logger.error(`Error restarting deployment ${req.params.id}:`, error);
-    res.status(500).json({ error: "Failed to restart deployment" });
+    logger.error("Error deleting deployment:", error);
+    res.status(500).json({ error: "Failed to delete deployment" });
   }
 });
 
