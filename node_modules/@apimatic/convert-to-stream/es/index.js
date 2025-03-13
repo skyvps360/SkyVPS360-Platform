@@ -1,1 +1,0 @@
-export { convertToStream } from './convertToStream.js';

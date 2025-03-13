@@ -1,98 +1,42 @@
 # Changes Required & Progress Tracking
 
-## Current Issues (High Priority)
-- [ ] Fix direct access to /servers/[id] routes
-  - [ ] Investigate module loading MIME type error
-  - [ ] Fix client-side routing for direct URL access
-  - [ ] Ensure proper route handling with refreshes
-- [ ] Snapshot Management
-  - [x] Add snapshot UI to server details page
-  - [x] Implement snapshot creation
-  - [x] Add snapshot restore functionality
-  - [x] Add snapshot deletion
-  - [x] Add server status check before snapshot operations
-  - [x] Add proper error handling for snapshot operations
+## Server Details Page (/servers/[id]) Issues
+- [ ] Fix direct access to /servers/[id] route
+  - [ ] Investigate and fix MIME type error for module loading
+  - [ ] Fix source loading issue from main.tsx
+  - [ ] Add proper route handling for direct URL access
+  - [ ] Implement proper server-side route validation
+  - [ ] Add fallback for failed module loading
+  - [ ] Fix Vite connection issues
 
-## Completed Tasks
-- [x] Server Details Page (/servers/[id])
-  - [x] Add components for OS display
-  - [x] Add server information display
-  - [x] Add network configuration display
-  - [x] Add terminal functionality
-  - [x] Add firewall management
-  - [x] Add volume management
-  - [x] Add snapshot management UI and functionality
-  - [x] Fix server metrics refresh API request method
-  - [x] Fix server details page JSX structure
-  - [x] Add proper error handling
-  - [x] Add loading states
-  - [x] Fix region display
-  - [x] Improve terminal display and functionality
+- [ ] Add Missing Snapshot UI Components
+  - [ ] Create SnapshotList component
+  - [ ] Add snapshot creation dialog
+  - [ ] Implement snapshot restore confirmation
+  - [ ] Add snapshot deletion with confirmation
+  - [ ] Add snapshot progress indicator
+  - [ ] Implement snapshot error handling
+  - [ ] Add snapshot size and date information display
 
-## In Progress
-- [ ] Routing Fixes
-  - [ ] Fix MIME type errors for direct route access
-  - [ ] Add proper client-side route handling
-  - [ ] Fix refresh behavior on direct routes
-  - [ ] Add route fallback handling
+## Critical Fixes Required
+- [ ] Fix module loading issues:
+  - [ ] Update Vite configuration for proper MIME types
+  - [ ] Fix main.tsx import path issues
+  - [ ] Add proper error boundaries for module loading failures
+  - [ ] Implement lazy loading for server details components
+  - [ ] Add loading fallback components
 
-## Coming Soon
-- [ ] Dashboard Improvements
-  - [ ] Add quick server actions
-  - [ ] Improve server listing performance
-  - [ ] Add server status indicators
-- [ ] VPS Creation Dialog Updates
-  - [ ] Remove 0.5GB VPS selection option
-  - [ ] Update processor type filters
-  - [ ] Add size option validation
+## Progress
 
-## Server Monitoring Improvements
-- [x] Fix API request method in refreshServerMetrics
-- [x] Add proper error handling for metrics refresh
-- [x] Improve metrics display and auto-refresh
-- [x] Add fallback data for unavailable metrics
+### Recent Issues (Latest First)
+- Module loading blocked due to MIME type issues
+- Direct access to /servers/[id] not working
+- Missing snapshot UI implementation
+- Vite connection instability
 
-## UI/UX Enhancements
-- [x] Add loading states for all operations
-- [x] Add proper error messages
-- [x] Improve button states during operations
-- [x] Add confirmation dialogs for destructive actions
-
-## Bug Fixes
-- [x] Fix server metrics refresh functionality
-- [x] Fix server details page structure
-- [x] Fix server ID parsing from URL
-- [x] Add error handling for server not found
-- [x] Fix snapshot create/restore/delete operations
-- [ ] Fix direct route access issues
-- [ ] Fix module loading MIME type errors
-
-## Technical Improvements
-- [x] Add snapshot management API endpoints
-- [x] Improve error handling across components
-- [x] Add proper TypeScript types for all operations
-- [x] Add loading and error states
-- [ ] Fix client-side routing issues
-- [ ] Improve module loading and bundling
-
-## Recent Updates (Latest First)
-1. Added snapshot management UI to server details page
-2. Fixed server metrics refresh API request method
-3. Fixed server details page JSX structure
-4. Improved error handling and loading states
-5. Added fallback metrics data
-6. Fixed snapshot operations (create/restore/delete)
-7. Discovered and documented direct route access issues
-8. Added comprehensive snapshot management functionality
-
-## Known Issues
-1. Direct access to /servers/[id] fails with MIME type error
-2. Module loading fails on direct route access
-3. Page refresh on server details doesn't maintain state
-
-## Next Steps
-1. Fix direct route access issues
-2. Improve client-side routing
-3. Add fallback routes and error boundaries
-4. Test and verify all routes work with direct access
-5. Document routing solutions for future reference
+### Next Steps
+1. Fix MIME type configuration in Vite setup
+2. Implement proper module loading error handling
+3. Add snapshot management UI components
+4. Test and verify direct route access
+5. Add comprehensive error boundaries

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
+import react from '@vitejs/plugin-react';
 
 // Function to safely import plugins
 async function safeImport(modulePath: string) {
@@ -39,38 +40,35 @@ export default defineConfig(async () => {
 
   return {
     plugins,
+    // Add server configuration with allowedHosts
     server: {
       host: true, // Listen on all addresses
       allowedHosts: ['skyvps360.xyz'], // Add your domain here
       hmr: {
         overlay: false, // Disable the error overlay
-      },
-      // Add middleware to handle SPA routing
-      middlewareMode: 'html',
-      fs: {
-        strict: false,
-        allow: ['..']
       }
     },
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, "./client/src"),
+        "@": path.resolve(__dirname, "./client"),
         "@shared": path.resolve(__dirname, "./shared"),
-        // Add aliases for common directories to ensure consistent resolution
-        "@components": path.resolve(__dirname, "./client/src/components"),
-        "@pages": path.resolve(__dirname, "./client/src/pages"),
-        "@hooks": path.resolve(__dirname, "./client/src/hooks"),
-        "@lib": path.resolve(__dirname, "./client/src/lib"),
-        "@utils": path.resolve(__dirname, "./client/src/utils"),
+        "@components": path.resolve(__dirname, "./client/components"),
+        "@pages": path.resolve(__dirname, "./client/pages"),
+        "@hooks": path.resolve(__dirname, "./client/hooks"),
+        "@lib": path.resolve(__dirname, "./client/lib"),
+        "@utils": path.resolve(__dirname, "./client/utils"),
+        "@servers": path.resolve(__dirname, "./client/servers"), // Fix the incorrect path
       },
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json']
     },
     // Use client directory as root
-    root: 'client',
+    root: path.resolve(__dirname, 'client'),
+    publicDir: path.resolve(__dirname, 'client/public'),
     build: {
       outDir: path.resolve(__dirname, "dist/client"),
       emptyOutDir: true,
       sourcemap: true,
+      // Specify the HTML entry point explicitly
       rollupOptions: {
         input: {
           main: path.resolve(__dirname, 'client/index.html')
@@ -89,26 +87,31 @@ export default defineConfig(async () => {
           }
         }
       },
+      // Use a more compatible build target for wider browser support
       target: ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
       // Change from terser to esbuild since terser is not installed
       minify: 'esbuild',
-      // Add SPA configuration
-      assetsDir: 'assets',
-      manifest: true
     },
-
-    // Add base URL configuration
-    base: '/',
-
     // Optimize dependency processing
     optimizeDeps: {
+      // Exclude problematic dependencies
+      exclude: [
+        '@paypal/react-paypal-js',
+        'lucide-react',
+        '@shared/schema',
+        '@shared/client-schema'
+      ],
       include: [
         'react',
         'react-dom',
         'wouter',
+        'react-router-dom',
         '@tanstack/react-query'
       ],
-      exclude: ['@shared/schema', '@shared/client-schema'],
+      esbuildOptions: {
+        target: 'es2020'
+      },
+      force: true // Force optimization to address dependency issues
     },
     // Ensure consistent environment variables
     define: {
@@ -116,10 +119,5 @@ export default defineConfig(async () => {
       'import.meta.env.BASE_URL': JSON.stringify('/'),
       'import.meta.env.VITE_DOMAIN': JSON.stringify(process.env.DOMAIN || 'https://skyvps360.xyz/')
     },
-    // Make sure it watches the right files
-    watch: {
-      usePolling: false,
-      ignored: ['**/node_modules/**', '**/dist/**']
-    }
   };
 });

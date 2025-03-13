@@ -298,48 +298,19 @@ async function createTestData() {
     // GitHub OAuth routes
     app.use("/auth/github", githubRoutes);
 
-    // Special routes before the catch-all
-    app.get("/github-guide", (req, res) => {
+    // Make sure Vite is configured correctly
+    if (process.env.NODE_ENV === 'development') {
       try {
-        const indexPath = path.resolve(__dirname, '../dist/client/index.html');
-        if (fs.existsSync(indexPath)) {
-          res.sendFile(indexPath);
-        } else {
-          const devIndexPath = path.resolve(__dirname, '../client/index.html');
-          if (fs.existsSync(devIndexPath)) {
-            res.sendFile(devIndexPath);
-          } else {
-            throw new Error('Could not find index.html');
-          }
-        }
-      } catch (e) {
-        logger.error('Error serving index.html for GitHub guide:', e);
-        res.status(500).send('Internal Server Error: Could not load GitHub guide');
+        logger.info("Starting server in development mode with Vite middleware...");
+        await setupVite(app, server);
+      } catch (error) {
+        logger.error("Failed to setup Vite middleware:", error);
+        process.exit(1);
       }
-    });
-
-    // Health check endpoint
-    app.get('/health', (req, res) => {
-      res.status(200).json({ status: 'ok', environment: process.env.NODE_ENV });
-    });
-
-    // Global error handler
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      logger.error("Express error handler:", err);
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      res.status(status).json({ message });
-    });
-
-    // Environment-specific setup
-    if (app.get("env") === "development") {
-      logger.info("Starting server in development mode with Vite middleware...");
-      await setupVite(app, server);
     } else {
       // Production mode
       logger.info("Starting server in production mode with static files...");
 
-      // Remove the explicit root handler and use the complete static serving setup
       // The setupStaticServing function will handle all static files and SPA routes
       setupStaticServing(app);
       logger.info("Static file serving configured");
