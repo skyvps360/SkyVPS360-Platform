@@ -380,7 +380,7 @@ export default function ServerDetailPage() {
   const [newPassword, setNewPassword] = useState("");
   const [ipv6Enabled, setIpv6Enabled] = useState(false);
   const [confirmIpv6Enable, setConfirmIpv6Enable] = useState(false);
-  
+
   // Form for disabling firewall with confirmation text - MOVED INSIDE COMPONENT
   const disableFirewallForm = useForm<ConfirmFirewallDisableFormValues>({
     resolver: zodResolver(confirmFirewallDisableSchema),
@@ -392,7 +392,7 @@ export default function ServerDetailPage() {
   // Debug info
   console.log("ServerDetailPage Params:", pathId);
   console.log("URL Path:", window.location.pathname);
-  
+
   // Parse the server ID from the URL - FIXED parsing logic
   let serverId: number = -1;
   if (pathId) {

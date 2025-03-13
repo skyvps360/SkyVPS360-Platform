@@ -23,8 +23,19 @@
   - [x] Add snapshot deletion
   - [x] Add snapshot listing UI
   - [x] Add proper error handling and loading states
-- [ ] Fix region display in server details
-- [ ] Improve terminal display and functionality
+- [x] Fix region display in server details
+- [x] Improve terminal display and functionality
+- [x] Fix server metrics refresh functionality
+- [x] Fix server details page JSX structure
+- [x] Fix server ID parsing from URL
+- [x] Add proper error handling for server not found
+- [x] Improve loading states and error messages
+
+## Server Monitoring
+- [x] Fix API request method in refreshServerMetrics
+- [x] Add proper error handling for metrics refresh
+- [x] Improve metrics display and auto-refresh functionality
+- [x] Add fallback data for unavailable metrics
 
 ## VPS Creation Dialog
 - [ ] Remove 0.5GB VPS selection option from size dropdown
@@ -49,22 +60,23 @@
   - Added size and region customization options
 - Added OS display component for better system information presentation
 - Added comprehensive snapshot management functionality
-  - Created SnapshotManager component with full CRUD operations
-  - Implemented proper error handling and loading states
-  - Added confirmation dialogs for destructive actions
-  - Added real-time status updates
-
-### In Progress
-- Region display improvements for server details
-- Terminal display and functionality enhancements
-
-### Next Steps
-1. Fix region & OS display issues
-2. Modify VPS creation options
-3. Update navigation buttons
-4. Complete terminal improvements
+- Fixed server details page structure and functionality
+  - Corrected JSX nesting issues in server-detail.tsx
+  - Fixed server ID parsing from URL parameters
+  - Added improved error handling and loading states
+  - Enhanced server metrics refresh functionality
+- Improved server monitoring system
+  - Fixed API request method in metrics refresh
+  - Added better error handling
+  - Improved metrics display
+  - Added fallback data for unavailable metrics
 
 ### Recent Updates (Latest First)
+- Fixed server metrics refresh API request method
+- Corrected JSX structure in server-detail.tsx
+- Improved server ID parsing from URL
+- Enhanced error handling and loading states
+- Added fallback metrics data
 - Added snapshot management UI with full functionality
 - Created OSDisplay component for better OS information presentation
 - Enhanced deployment options with size and region customization
