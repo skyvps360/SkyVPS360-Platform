@@ -570,9 +570,9 @@ export default function Dashboard() {
 
               {/* Replace the Dialog with a Link to /github-guide */}
               <Button variant="outline" asChild>
-                <Link href="/github-guide">
+                <Link href="/github-guide" className="flex items-center">
                   <Github className="h-4 w-4 mr-2" />
-                  Deploy GitHub App
+                  <span>Deploy GitHub App</span>
                 </Link>
               </Button>
             </div>

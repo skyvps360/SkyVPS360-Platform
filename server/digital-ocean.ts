@@ -2248,6 +2248,68 @@ runcmd:
       throw new Error(`Failed to get snapshot details: ${error}`);
     }
   }
+
+  async removeFirewallRule(firewallId: string, rule: any, direction: 'inbound' | 'outbound'): Promise<any> {
+    console.log(`Attempting to remove ${direction} rule:`, JSON.stringify(rule));
+
+    try {
+      // First, get the current firewall configuration
+      const firewall = await this.getFirewall(firewallId);
+      if (!firewall) {
+        throw new Error(`Firewall ${firewallId} not found`);
+      }
+
+      // Create a deep copy of the current rules
+      const currentRules = {
+        inbound_rules: JSON.parse(JSON.stringify(firewall.inbound_rules || [])),
+        outbound_rules: JSON.parse(JSON.stringify(firewall.outbound_rules || []))
+      };
+
+      // Get the rules array for the specified direction
+      const rulesKey = direction === 'inbound' ? 'inbound_rules' : 'outbound_rules';
+      const rules = currentRules[rulesKey];
+
+      // Find and remove the rule that matches
+      const ruleIndex = this.findMatchingRuleIndex(rules, rule);
+      if (ruleIndex === -1) {
+        throw new Error(`Rule not found in ${direction} rules`);
+      }
+
+      // Remove the rule
+      rules.splice(ruleIndex, 1);
+
+      // Use DELETE endpoint to remove specific rule instead of updating entire firewall
+      const endpoint = `/v2/firewalls/${firewallId}/rules`;
+      const payload = {
+        [direction === 'inbound' ? 'remove_inbound_rules' : 'remove_outbound_rules']: [rule]
+      };
+
+      console.log(`Removing ${direction} rule using DELETE endpoint:`, JSON.stringify(payload));
+      return await this.apiRequest(endpoint, 'DELETE', payload);
+    } catch (error) {
+      console.error(`DigitalOcean API error removing rule:`, error);
+      throw new Error(`Failed to update DigitalOcean firewall: ${error.message}`);
+    }
+  }
+
+  // Helper method to find a matching rule in the rules array
+  private findMatchingRuleIndex(rules: any[], ruleToFind: any): number {
+    return rules.findIndex(rule => {
+      // Compare protocol and ports
+      const protocolMatch = rule.protocol === ruleToFind.protocol;
+      const portsMatch = rule.ports === ruleToFind.ports;
+
+      // Compare sources/destinations
+      let addressesMatch = false;
+      if (rule.sources && ruleToFind.sources) {
+        addressesMatch = JSON.stringify(rule.sources.addresses) === JSON.stringify(ruleToFind.sources.addresses);
+      } else if (rule.destinations && ruleToFind.destinations) {
+        addressesMatch = JSON.stringify(rule.destinations.addresses) === JSON.stringify(ruleToFind.destinations.addresses);
+      }
+
+      return protocolMatch && portsMatch && addressesMatch;
+    });
+  }
 }
 
 export const digitalOcean = new DigitalOceanClient();

@@ -24,6 +24,7 @@ import { createSubscription, capturePayment } from "./paypal";
 import { insertTicketSchema, insertMessageSchema, insertIPBanSchema } from "@shared/schema";
 import { getServerBandwidth, calculateBandwidthOverages as calculateBandwidthOveragesNew } from "./bandwidth-billing";
 import healthRoutes from './routes/health.js';
+import { requireAuth } from './middleware/auth';
 
 // Cost constants for server and storage pricing
 const COSTS = {
@@ -1896,91 +1897,48 @@ export async function registerRoutes(app: Express): Promise<HttpServer> {
   });
 
   // Delete a firewall rule
-  app.delete("/api/servers/:id/firewall/rules", async (req, res) => {
-    if (!req.user) return res.sendStatus(401);
-
-    const server = await storage.getServer(parseInt(req.params.id));
-    if (!server || (server.userId !== req.user.id && !req.user.isAdmin)) {
-      return res.sendStatus(404);
-    }
-
+  app.delete('/api/servers/:id/firewall/rules', requireAuth, async (req, res) => {
     try {
-      const { rule_type, rule } = req.body;
+      const serverId = parseInt(req.params.id);
+      const { rule, direction = 'inbound' } = req.body;
 
-      if (!rule_type || !rule || !['inbound', 'outbound'].includes(rule_type)) {
-        return res.status(400).json({ message: "Invalid rule format. Specify 'rule_type' as 'inbound' or 'outbound' and provide a valid rule object." });
+      if (!rule) {
+        return res.status(400).json({ message: 'Missing rule data' });
       }
-      console.log(`Attempting to delete ${rule_type} rule:`, JSON.stringify(rule));
 
-      // Get the current firewall
-      const firewall = await digitalOcean.getFirewallByDropletId(server.dropletId);
+      // Validate that the user owns this server
+      const server = await db.query.servers.findFirst({
+        where: eq(servers.id, serverId),
+        columns: {
+          id: true,
+          userId: true,
+          dropletId: true
+        }
+      });
 
+      if (!server || (server.userId !== req.user?.id && !req.user?.isAdmin)) {
+        return res.status(403).json({ message: 'Not authorized to access this server' });
+      }
+
+      const dropletId = server.dropletId;
+      console.log(`Attempting to delete ${direction} rule:`, JSON.stringify(rule));
+
+      // Fetch the firewall for this server
+      const firewall = await digitalOcean.getFirewallByDropletId(dropletId);
       if (!firewall) {
-        // If no firewall exists, we don't need to delete anything
-        console.log(`No firewall found for server ${server.id} when trying to delete rule`);
-        return res.status(404).json({ message: "No firewall found for this server" });
+        return res.status(404).json({ message: 'Firewall not found for this server' });
       }
-      console.log(`Found firewall ${firewall.id} with ${firewall.inbound_rules.length} inbound and ${firewall.outbound_rules.length} outbound rules`);
 
-      // For now, we'll work around the Digital Ocean API limitation by replacing the entire rule set
-      // This is more reliable than trying to delete individual rules which can be problematic
-      try {
-        // Create new arrays excluding the rule we want to delete
-        const updatedInboundRules = rule_type === 'inbound'
-          ? firewall.inbound_rules.filter(r =>
-            !(r.protocol === rule.protocol &&
-              r.ports === rule.ports &&
-              JSON.stringify(r.sources) === JSON.stringify(rule.sources)))
-          : firewall.inbound_rules;
+      // Use the new method to remove the specific rule
+      const result = await digitalOcean.removeFirewallRule(firewall.id, rule, direction);
 
-        const updatedOutboundRules = rule_type === 'outbound'
-          ? firewall.outbound_rules.filter(r =>
-            !(r.protocol === rule.protocol &&
-              r.ports === rule.ports &&
-              JSON.stringify(r.destinations) === JSON.stringify(rule.destinations)))
-          : firewall.outbound_rules;
+      // Fetch the updated firewall to return to the client
+      const updatedFirewall = await digitalOcean.getFirewallByDropletId(dropletId);
 
-        // Check if we should treat this as a mock firewall
-        const isMockFirewall = firewall.id && (
-          firewall.id.includes('fallback') ||
-          firewall.id.includes('mock') ||
-          digitalOcean.useMock ||
-          firewall.id.length < 30  // Real DO firewall IDs are long UUIDs
-        );
-
-        // Always use the DigitalOcean API directly - no mock fallback
-        if (!firewall.id) {
-          throw new Error("Firewall ID is missing");
-        }
-
-        try {
-          // Make the API request to update the firewall
-          console.log(`Updating firewall ${firewall.id} with DigitalOcean API`);
-          const updatedFirewall = await digitalOcean.updateFirewall(
-            firewall.id,
-            {
-              inbound_rules: updatedInboundRules,
-              outbound_rules: updatedOutboundRules
-            }
-          );
-
-          res.json(updatedFirewall);
-        } catch (apiError) {
-          console.error(`DigitalOcean API error removing rule: ${apiError}`);
-          throw apiError; // Re-throw to be caught by the outer catch block
-        }
-      } catch (updateError) {
-        console.error("Error updating firewall rules:", updateError);
-
-        // No mock fallback - properly handle the error
-        res.status(500).json({
-          message: "Failed to update firewall rules",
-          error: (updateError as Error).message
-        });
-      }
+      res.json(updatedFirewall);
     } catch (error) {
-      console.error("Error deleting firewall rule:", error);
-      res.status(500).json({ message: "Failed to delete firewall rule" });
+      console.error('Error updating firewall rules:', error);
+      res.status(500).json({ message: 'Failed to update firewall rules', error: error.message });
     }
   });
 

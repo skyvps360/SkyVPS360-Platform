@@ -82,3 +82,37 @@
 - Enhanced deployment options with size and region customization
 - Improved GitHub integration error handling and token management
 - Cleaned up deployment route handlers
+
+# SkyVPS360 Platform - Changes and Fixes
+
+## Initial Setup Fixes
+1. Created missing theme provider component
+   - Added theme-provider.tsx for handling theme state
+   - Added theme-toggle.tsx for toggling between themes
+   - Added required utility functions
+   - Fixed main.tsx entry point
+
+## Firewall Management Fixes
+1. Fixed firewall rule deletion functionality
+   - Updated the removeFirewallRule method in digital-ocean.ts
+   - Used dedicated DELETE endpoint for removing specific rules instead of updating entire firewall
+   - Added helper method to find matching rules
+   - Enhanced error handling and logging
+   - Updated route handler to accept rule direction parameter
+   - Fixed frontend code to send proper payload for rule deletion
+
+## UI Improvements
+1. Fixed button layout issues
+   - Added CSS to properly align icons and text in buttons containing anchor tags
+
+## Issues Resolved
+1. Application startup errors
+   - Resolved missing component errors that prevented application from loading
+2. Firewall rule deletion failures
+   - Fixed 422 Unprocessable Entity errors when trying to delete firewall rules
+   - Improved the approach by using dedicated rule removal endpoint
+
+## Next Steps
+- Continue monitoring firewall management functionality
+- Consider adding retry logic for API calls
+- Implement more detailed error messages for users

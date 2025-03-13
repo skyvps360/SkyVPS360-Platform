@@ -65,12 +65,18 @@
   }
 }
 
-/* Fix button a tags with icons */
+/* Fix button styling with anchor tags */
 button a {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  width: 100%;
   justify-content: center;
+  width: 100%;
+}
+
+/* Ensure icons are properly aligned */
+button a svg {
+  display: inline-block;
+  vertical-align: middle;
 }
 
 /* Print styles for documentation */

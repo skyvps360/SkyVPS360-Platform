@@ -79,17 +79,18 @@ export default function GitHubConnect({ className }: GitHubConnectProps) {
     enabled: deployDialogOpen,
   });
 
-  const handleConnect = async () => {
+  const handleConnectGitHub = async () => {
     try {
       setIsConnecting(true);
 
-      // Simplify by using direct server-side redirect
-      window.location.href = '/api/github/auth-url';
+      // Direct browser to GitHub OAuth URL instead of using AJAX
+      window.location.href = '/api/github/auth';
     } catch (error) {
+      console.error("GitHub connection error:", error);
       toast({
-        title: "Error",
-        description: (error as Error).message,
         variant: "destructive",
+        title: "Connection Failed",
+        description: "Failed to connect to GitHub. Please try again later."
       });
       setIsConnecting(false);
     }
@@ -423,7 +424,7 @@ export default function GitHubConnect({ className }: GitHubConnectProps) {
             <div className="space-y-2">
               {/* Original button that uses the server-side redirect */}
               <Button
-                onClick={handleConnect}
+                onClick={handleConnectGitHub}
                 disabled={isConnecting}
                 className="w-full"
               >
