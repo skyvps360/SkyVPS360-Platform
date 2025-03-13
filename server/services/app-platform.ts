@@ -21,14 +21,7 @@ interface DeploymentInput {
 /**
  * Creates a new app on DigitalOcean App Platform from a GitHub repository
  */
-export async function createAppFromGitHub(userId: number, options: {
-  name: string;
-  repository: string;
-  branch: string;
-  region: string;
-  size: string;
-  environmentVariables?: Record<string, string>;
-}) {
+export async function createAppFromGitHub(userId: number, options: DeploymentInput) {
   // Get the user to retrieve GitHub token
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId)
@@ -40,6 +33,9 @@ export async function createAppFromGitHub(userId: number, options: {
 
   // Format the repository to match DO's expectations
   const [owner, repo] = options.repository.split('/');
+  if (!owner || !repo) {
+    throw new Error("Invalid repository format. Expected 'owner/repo'");
+  }
 
   // Build the App Platform spec
   const appSpec = {
@@ -47,22 +43,29 @@ export async function createAppFromGitHub(userId: number, options: {
     region: options.region,
     services: [
       {
-        name: options.name,
-        github: {
-          repo: options.repository,
-          branch: options.branch,
-          deploy_on_push: true
-        },
+        name: `${repo}-service`,
         source_dir: "/",
+        github: {
+          branch: options.branch,
+          deploy_on_push: true,
+          repo: `${owner}/${repo}`,
+        },
         instance_size_slug: options.size,
         instance_count: 1,
-        http_port: 8080,
-        run_command: "start",
-        envs: Object.entries(options.environmentVariables || {}).map(([key, value]) => ({
+        run_command: "npm start",
+        build_command: "npm run build",
+        envs: Object.entries(options.envVars || {}).map(([key, value]) => ({
           key,
           value,
-          scope: "RUN_AND_BUILD_TIME"
-        }))
+          scope: "RUN_AND_BUILD_TIME",
+          type: "GENERAL"
+        })),
+        http_port: 8080,
+        health_check: {
+          http_path: "/",
+          initial_delay_seconds: 30,
+          period_seconds: 10
+        }
       }
     ]
   };
@@ -70,26 +73,29 @@ export async function createAppFromGitHub(userId: number, options: {
   try {
     logger.info(`Creating new App Platform app: ${options.name} from ${options.repository}:${options.branch}`);
 
-    const response = await fetch(`${BASE_URL}/apps`, {
+    const response = await fetch(`${APP_PLATFORM_BASE}`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${DO_TOKEN}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        spec: appSpec
-      })
+      body: JSON.stringify({ spec: appSpec })
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errorData = await response.text();
-      logger.error(`Error creating app: ${response.status} ${errorData}`);
-      throw new Error(`Failed to create app: ${response.status} ${errorData}`);
+      logger.error(`Error creating app: ${response.status}`, data);
+      throw new Error(data.message || "Failed to create app");
     }
 
-    const data = await response.json();
     logger.success(`Successfully created app: ${data.app.id}`);
-    return data.app;
+    return {
+      id: data.app.id,
+      name: data.app.spec.name,
+      url: data.app.live_url,
+      status: data.app.phase || "unknown"
+    };
   } catch (error) {
     logger.error(`Error in createAppFromGitHub: ${(error as Error).message}`);
     throw error;

@@ -346,73 +346,33 @@ function ActiveFirewallRules({ serverId }: { serverId: number }) {
 }
 
 // Map regions to flag emojis
-const regionFlags: { [key: string]: string } = {
-  nyc1: "🇺🇸 New York",
-  nyc2: "🇺🇸 New York",
-  nyc3: "🇺🇸 New York",
-  sfo3: "🇺🇸 San Francisco",
-  sfo2: "🇺🇸 San Francisco",
-  ams3: "🇳🇱 Amsterdam",
-  sgp1: "🇸🇬 Singapore",
-  lon1: "🇬🇧 London",
-  tor1: "🇨🇦 Toronto",
-  blr1: "🇮🇳 Bangalore",
-  syd1: "🇦🇺 Sydney",
+const regionFlags = {
+  nyc1: "🇺🇸 New York 1",
+  nyc2: "🇺🇸 New York 2",
+  sgp1: "🇸🇬 Singapore 1",
+  lon1: "🇬🇧 London 1",
+  nyc3: "🇺🇸 New York 3",
+  ams3: "🇳🇱 Amsterdam 3",
+  fra1: "🇩🇪 Frankfurt 1",
+  tor1: "🇨🇦 Toronto 1",
+  sfo2: "🇺🇸 San Francisco 2",
+  blr1: "🇮🇳 Bangalore 1",
+  sfo3: "🇺🇸 San Francisco 3",
+  syd1: "🇦🇺 Sydney 1"
 };
 
-// Schema already defined above
+// Add function to get OS display name
+const getOSDisplayName = (application: string | null) => {
+  if (!application) return "Ubuntu 22.04";
+  const appParts = application.split(" on ");
+  if (appParts.length > 1) {
+    return appParts[0];
+  }
+  return application;
+};
 
 export default function ServerDetailPage() {
-  // Extract and validate params - simplified approach for better compatibility
-  const params = useParams<{ id: string }>();
-  const pathId = params?.id;
-
-  // Form for disabling firewall with confirmation text
-  const disableFirewallForm = useForm<ConfirmFirewallDisableFormValues>({
-    resolver: zodResolver(confirmFirewallDisableSchema),
-    defaultValues: {
-      confirmationText: "" as any,
-    },
-  });
-
-  // Debug info
-  console.log("ServerDetailPage Params:", params);
-  console.log("Path ID:", pathId);
-  console.log("URL Path:", window.location.pathname);
-
-  // Parse the server ID from the URL
-  let serverId: number = -1;
-
-  if (pathId) {
-    try {
-      // Parse the server ID
-      serverId = parseInt(pathId);
-
-      // If we get an invalid ID, show an error
-      if (isNaN(serverId) || serverId <= 0) {
-        console.error("Invalid server ID in URL:", pathId);
-        serverId = -1; // Use an invalid ID that will be caught by the error handling
-      } else {
-        console.log("Valid server ID found:", serverId);
-      }
-    } catch (err) {
-      console.error("Error parsing server ID:", err);
-      serverId = -1;
-    }
-  } else {
-    // As a fallback, try to extract ID from URL pathname
-    const pathMatch = window.location.pathname.match(/\/servers\/(\d+)/);
-    if (pathMatch && pathMatch[1]) {
-      try {
-        serverId = parseInt(pathMatch[1]);
-        console.log("Extracted server ID from URL path:", serverId);
-      } catch (e) {
-        console.error("Failed to parse ID from URL path");
-      }
-    } else {
-      console.error("No server ID provided in URL");
-    }
-  }
+  const { pathId } = useParams();
   const { user, refetchUser } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -420,6 +380,43 @@ export default function ServerDetailPage() {
   const [newPassword, setNewPassword] = useState("");
   const [ipv6Enabled, setIpv6Enabled] = useState(false);
   const [confirmIpv6Enable, setConfirmIpv6Enable] = useState(false);
+
+  // Form for disabling firewall with confirmation text - MOVED INSIDE COMPONENT
+  const disableFirewallForm = useForm<ConfirmFirewallDisableFormValues>({
+    resolver: zodResolver(confirmFirewallDisableSchema),
+    defaultValues: {
+      confirmationText: "",
+    },
+  });
+
+  // Debug info
+  console.log("ServerDetailPage Params:", pathId);
+  console.log("URL Path:", window.location.pathname);
+
+  // Parse the server ID from the URL - FIXED parsing logic
+  let serverId: number = -1;
+  if (pathId) {
+    try {
+      serverId = parseInt(pathId);
+      console.log("Parsed server ID:", serverId); // Add more debug info
+      if (isNaN(serverId) || serverId <= 0) {
+        console.error("Invalid server ID in URL:", pathId);
+        serverId = -1;
+      }
+    } catch (err) {
+      console.error("Error parsing server ID:", err);
+      serverId = -1;
+    }
+  } else {
+    // Extract ID directly from path if pathId is undefined
+    const match = window.location.pathname.match(/\/servers\/(\d+)/);
+    if (match && match[1]) {
+      serverId = parseInt(match[1]);
+      console.log("Extracted server ID from path:", serverId);
+    } else {
+      console.error("Could not extract server ID from path:", window.location.pathname);
+    }
+  }
 
   // Parse URL to check for tab query parameter
   const searchParams = new URLSearchParams(window.location.search);
@@ -435,13 +432,16 @@ export default function ServerDetailPage() {
   } = useQuery<Server>({
     queryKey: [`/api/servers/${serverId}`],
     queryFn: async () => {
+      if (serverId <= 0) {
+        throw new Error("Invalid server ID: " + serverId);
+      }
       const response = await fetch(`/api/servers/${serverId}`);
       if (!response.ok) {
         throw new Error(`Error fetching server: ${response.statusText}`);
       }
       return response.json();
     },
-    enabled: !isNaN(serverId) && !!user,
+    enabled: serverId > 0 && !!user,
     retry: 3,
     retryDelay: 1000,
     staleTime: 10000, // Shorter stale time for more responsive UI
@@ -1035,7 +1035,6 @@ export default function ServerDetailPage() {
                             </Button>
                           </div>
                         </div>
-
                         <div>
                           <span className="text-xs text-muted-foreground">
                             IPv4 Gateway
@@ -1044,15 +1043,14 @@ export default function ServerDetailPage() {
                             <code className="bg-muted px-2 py-1 rounded text-sm">
                               {server.ipAddress
                                 ? server.ipAddress
-                                    .split(".")
-                                    .slice(0, 3)
-                                    .join(".") + ".1"
+                                  .split(".")
+                                  .slice(0, 3)
+                                  .join(".") + ".1"
                                 : "Unavailable"}
                             </code>
                           </div>
                         </div>
                       </div>
-
                       <div>
                         <span className="text-xs text-muted-foreground">
                           IPv4 Subnet Mask
@@ -1066,7 +1064,6 @@ export default function ServerDetailPage() {
                           </span>
                         </div>
                       </div>
-
                       <div className="text-xs text-muted-foreground">
                         <p>
                           Your server has a static public IPv4 address assigned
@@ -1225,7 +1222,6 @@ export default function ServerDetailPage() {
                         Configure security rules for your server
                       </p>
                     </div>
-
                     {/* Create/Manage Firewall Button Group */}
                     <div className="flex gap-2">
                       <ActiveFirewallCheck serverId={serverId}>
@@ -1335,7 +1331,6 @@ export default function ServerDetailPage() {
                                                 error instanceof Error
                                                   ? error.message
                                                   : "An unknown error occurred",
-                                              variant: "destructive",
                                             });
                                           }
                                         },
@@ -1406,13 +1401,11 @@ export default function ServerDetailPage() {
                       </Dialog>
                     </div>
                   </div>
-
                   {/* Active rules section - simplified display */}
                   <div className="space-y-3">
                     {/* Fetch and display actual rules from API */}
                     <ActiveFirewallRules serverId={serverId} />
                   </div>
-
                   <p className="text-xs text-muted-foreground mt-4">
                     First, enable the firewall by clicking "Enable Firewall",
                     then use "Manage Firewall Rules" to add protection rules for
@@ -1439,7 +1432,6 @@ export default function ServerDetailPage() {
                 <ServerMonitoring serverId={serverId} />
               </CardContent>
             </Card>
-
             {/* Network Performance & Bandwidth Monitoring */}
             <Card>
               <CardHeader>
@@ -1464,7 +1456,6 @@ export default function ServerDetailPage() {
                     TB per month.
                   </p>
                 </div>
-
                 {/* Network Usage Monitoring */}
                 <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-md p-4">
                   <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-2">
@@ -1472,7 +1463,6 @@ export default function ServerDetailPage() {
                   </h3>
                   <NetworkUsage serverId={serverId} size={server.size} />
                 </div>
-
                 {/* Bandwidth Details Link */}
                 <div className="flex justify-end">
                   <Link href={`/servers/${serverId}/bandwidth-details`}>
@@ -1499,7 +1489,6 @@ export default function ServerDetailPage() {
             <CardContent>
               {/* CloudRack Terminal Notice */}
               <CloudRackTerminalNotice />
-
               {/* Server Access Section - Password Authentication */}
               <div className="mb-6">
                 <h3 className="text-lg font-medium mb-2">Remote Access</h3>
@@ -1528,7 +1517,6 @@ export default function ServerDetailPage() {
                   You will be prompted for the root password you set during
                   server creation.
                 </p>
-
                 {/* Password Authentication */}
                 <div className="mt-4">
                   <div className="bg-card border rounded-md p-4">
@@ -1589,7 +1577,6 @@ export default function ServerDetailPage() {
                   </div>
                 </div>
               </div>
-
               {/* Terminal Section */}
               <div className="mt-8 border-t pt-6">
                 <h3 className="text-lg font-medium mb-4">

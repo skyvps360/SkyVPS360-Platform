@@ -18,7 +18,8 @@ export async function deployGitHubRepo({
   branch = "main",
   githubToken,
   region = "nyc",
-  environmentVariables = {}
+  environmentVariables = {},
+  size = "basic-xs"
 }) {
   try {
     logger.info(`Deploying ${repositoryOwner}/${repositoryName} (${branch}) to DigitalOcean App Platform`);
@@ -33,29 +34,34 @@ export async function deployGitHubRepo({
       type: "GENERAL"
     }));
 
-    // Create app specification
+    // Create app specification following DO App Platform spec format
     const appSpec = {
       name: appName,
-      region,
-      services: [
-        {
-          name: repositoryName,
-          github: {
-            repo: `${repositoryOwner}/${repositoryName}`,
-            branch,
-            deploy_on_push: true
-          },
-          source_dir: "/",
-          envs: formattedEnvVars,
-          instance_count: 1,
-          instance_size_slug: "basic-xs"
-        }
-      ],
-      github: {
-        // Using deployed user's GitHub token for repo access
-        repo: `${repositoryOwner}/${repositoryName}`,
-        branch,
-        deploy_on_push: true
+      region: region,
+      spec: {
+        name: appName,
+        services: [
+          {
+            name: repositoryName,
+            source_dir: "/",
+            github: {
+              branch: branch,
+              deploy_on_push: true,
+              repo: `${repositoryOwner}/${repositoryName}`,
+              // Add GitHub token for private repos
+              auth: {
+                type: "GITHUB",
+                token: githubToken
+              }
+            },
+            instance_count: 1,
+            instance_size_slug: size,
+            routes: [{ path: "/" }],
+            envs: formattedEnvVars,
+            run_command: "npm start",
+            build_command: "npm install && npm run build"
+          }
+        ]
       }
     };
 
@@ -64,7 +70,8 @@ export async function deployGitHubRepo({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${DO_API_KEY}`
+        "Authorization": `Bearer ${DO_API_KEY}`,
+        "Accept": "application/json"
       },
       body: JSON.stringify(appSpec)
     });
@@ -80,9 +87,9 @@ export async function deployGitHubRepo({
 
     return {
       app_id: data.app.id,
-      live_url: data.app.live_url,
+      live_url: data.app.live_url || data.app.default_ingress,
       created_at: data.app.created_at,
-      default_ingress: data.app.default_ingress
+      status: data.app.status
     };
   } catch (error) {
     logger.error("Error deploying to DigitalOcean:", error);
@@ -93,7 +100,7 @@ export async function deployGitHubRepo({
 /**
  * Get status of a DigitalOcean App Platform app
  */
-export async function getAppStatus(appId) {
+export async function getAppStatus(appId: string) {
   try {
     const response = await fetch(`${DO_API_URL}/apps/${appId}`, {
       headers: {
@@ -103,15 +110,14 @@ export async function getAppStatus(appId) {
 
     if (!response.ok) {
       const errorData = await response.json();
-      logger.error(`Error fetching app status (${response.status}):`, errorData);
-      return "unknown";
+      throw new Error(errorData.message || response.statusText);
     }
 
     const data = await response.json();
-    return data.app.phase || "unknown";
+    return data.app.status;
   } catch (error) {
     logger.error(`Error getting app status for ${appId}:`, error);
-    return "error";
+    throw error;
   }
 }
 

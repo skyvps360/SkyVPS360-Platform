@@ -41,11 +41,11 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
   const { toast } = useToast();
   const [activeMetric, setActiveMetric] = useState<string>("cpu");
   const [refreshInterval, setRefreshInterval] = useState<number>(30000); // 30 seconds default
-  
+
   // Force auto-refresh every refreshInterval ms (default 30 seconds)
   useEffect(() => {
     if (refreshInterval <= 0) return;
-    
+
     console.log(`Setting up metrics refresh interval: ${refreshInterval}ms for server ${serverId}`);
     const timer = setInterval(() => {
       console.log(`Auto-refreshing metrics for server ${serverId}`);
@@ -53,7 +53,7 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
       queryClient.invalidateQueries({ queryKey: [`/api/servers/${serverId}/metrics/history`] });
       queryClient.invalidateQueries({ queryKey: [`/api/servers/${serverId}`] });
     }, refreshInterval);
-    
+
     return () => {
       console.log(`Clearing metrics refresh interval for server ${serverId}`);
       clearInterval(timer);
@@ -75,7 +75,7 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
   };
 
   // Query for latest metrics
-  const { 
+  const {
     data: latestMetric,
     isLoading: isLoadingLatest,
     error: latestError,
@@ -89,7 +89,7 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
   });
 
   // Query for historical metrics
-  const { 
+  const {
     data: metricsHistoryData,
     isLoading: isLoadingHistory,
     error: historyError,
@@ -109,7 +109,7 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
     refetchInterval: refreshInterval > 0 ? refreshInterval : undefined,
     refetchOnWindowFocus: true
   });
-  
+
   // Query to get volumes attached to this server
   const { data: volumes, refetch: refetchVolumes } = useQuery<Volume[]>({
     queryKey: [`/api/servers/${serverId}/volumes`],
@@ -125,7 +125,7 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
   // Force refresh metrics 
   const { mutate: refreshServerMetrics, isPending: isRefreshing } = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/api/servers/${serverId}/metrics/refresh`, 'POST');
+      return await apiRequest('POST', `/api/servers/${serverId}/metrics/refresh`);
     },
     onSuccess: (data) => {
       toast({
@@ -161,26 +161,26 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
   // Function to format bytes to a human-readable format
   const formatBytes = (bytes: number, decimals = 2) => {
     if (bytes === 0) return '0 Bytes';
-    
+
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    
+
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   };
 
   // Function to format time elapsed since creation as a relative time
   const formatRelativeTime = (createdAt: string | null) => {
     if (!createdAt) return "Unknown";
-    
+
     const created = new Date(createdAt);
     const now = new Date();
     const diffSeconds = Math.floor((now.getTime() - created.getTime()) / 1000);
-    
+
     const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-    
+
     // Convert to appropriate time unit
     if (diffSeconds < 60) {
       return rtf.format(-diffSeconds, 'second');
@@ -203,7 +203,7 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
   const handleRefreshMetrics = () => {
     // First try the mutation which fetches fresh metrics from the server
     refreshServerMetrics();
-    
+
     // Also directly refetch from the API to ensure immediate UI update
     refetchLatestMetric();
     refetchHistoryMetrics();
@@ -254,9 +254,9 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Performance Monitoring</h2>
         <div className="flex items-center gap-2">
-          <Button 
-            variant={refreshInterval > 0 ? "outline" : "ghost"} 
-            size="sm" 
+          <Button
+            variant={refreshInterval > 0 ? "outline" : "ghost"}
+            size="sm"
             onClick={toggleAutoRefresh}
             className={refreshInterval > 0 ? "border-green-500 text-green-600" : ""}
           >
@@ -270,9 +270,9 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
               </span>
             ) : "Auto-refresh: Off"}
           </Button>
-          <Button 
-            size="sm" 
-            onClick={handleRefreshMetrics} 
+          <Button
+            size="sm"
+            onClick={handleRefreshMetrics}
             disabled={isRefreshing}
           >
             {isRefreshing ? "Refreshing..." : "Refresh Now"}
@@ -304,14 +304,14 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
                   Refreshed {formatRelativeTime(server?.lastMonitored ? server.lastMonitored.toString() : null)}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {server?.lastMonitored ? 
-                    `Server monitoring started: ${new Date(server.lastMonitored).toLocaleString()}` : 
+                  {server?.lastMonitored ?
+                    `Server monitoring started: ${new Date(server.lastMonitored).toLocaleString()}` :
                     "Monitoring not started yet"
                   }
                 </div>
               </div>
             </div>
-            
+
             {/* Volume Information */}
             <div className="space-y-2">
               <div className="flex items-center text-sm font-medium">
@@ -321,13 +321,13 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
               <div className="text-sm">
                 <div className="font-semibold">{volumes?.length || 0} volumes</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {volumes?.length 
-                    ? `Total: ${volumes.reduce((sum, vol) => sum + (vol.size || 0), 0)} GB` 
+                  {volumes?.length
+                    ? `Total: ${volumes.reduce((sum, vol) => sum + (vol.size || 0), 0)} GB`
                     : "No volumes attached"}
                 </div>
               </div>
             </div>
-            
+
             {/* Network Info */}
             <div className="space-y-2">
               <div className="flex items-center text-sm font-medium">
@@ -393,8 +393,8 @@ export default function ServerMonitoring({ serverId }: ServerMetricsProps) {
             <Progress value={currentMetrics.diskUsage} className="h-2" />
             <div className="text-xs text-muted-foreground mt-1">
               {Math.round((specs.disk * currentMetrics.diskUsage) / 100)} GB of {specs.disk} GB
-              {volumes?.length ? 
-                <span className="ml-1">+ {volumes.reduce((sum, vol) => sum + (vol.size || 0), 0)} GB external</span> 
+              {volumes?.length ?
+                <span className="ml-1">+ {volumes.reduce((sum, vol) => sum + (vol.size || 0), 0)} GB external</span>
                 : null
               }
             </div>
