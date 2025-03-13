@@ -39,12 +39,17 @@ export default defineConfig(async () => {
 
   return {
     plugins,
-    // Add server configuration with allowedHosts
     server: {
       host: true, // Listen on all addresses
       allowedHosts: ['skyvps360.xyz'], // Add your domain here
       hmr: {
         overlay: false, // Disable the error overlay
+      },
+      // Add middleware to handle SPA routing
+      middlewareMode: 'html',
+      fs: {
+        strict: false,
+        allow: ['..']
       }
     },
     resolve: {
@@ -66,7 +71,6 @@ export default defineConfig(async () => {
       outDir: path.resolve(__dirname, "dist/client"),
       emptyOutDir: true,
       sourcemap: true,
-      // Specify the HTML entry point explicitly
       rollupOptions: {
         input: {
           main: path.resolve(__dirname, 'client/index.html')
@@ -85,11 +89,17 @@ export default defineConfig(async () => {
           }
         }
       },
-      // Use a more compatible build target for wider browser support
       target: ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
       // Change from terser to esbuild since terser is not installed
       minify: 'esbuild',
+      // Add SPA configuration
+      assetsDir: 'assets',
+      manifest: true
     },
+
+    // Add base URL configuration
+    base: '/',
+
     // Optimize dependency processing
     optimizeDeps: {
       include: [

@@ -30,90 +30,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 
-// Extended Server interface with additional properties for UI display
-// Don't extend SchemaServer since the rootPassword types don't match
-interface Server {
-  id: number;
-  userId: number;
-  name: string;
-  dropletId: string;
-  region: string;
-  size: string;
-  status: string;
-  ipAddress: string | null;
-  ipv6Address: string | null;
-  specs: { memory: number; vcpus: number; disk: number } | null;
-  application: string | null;
-  lastMonitored: Date | null;
-  rootPassword?: string | null; // Make optional with null
-  rootPassUpdated?: boolean; // Flag to indicate if a root password has been set or updated
-  createdAt?: Date | string | null; // Server creation timestamp
-}
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  HardDrive,
-  Server as ServerIcon,
-  ArrowLeft,
-  Trash2,
-  RefreshCw,
-  Power,
-  PowerOff,
-  Terminal,
-  CopyPlus,
-  Edit,
-  Save,
-  Globe,
-  Wifi,
-  Shield,
-  BarChart,
-  BarChart3,
-  Check,
-  ExternalLink,
-  Key,
-  Lock,
-  Maximize2,
-  CheckCircle,
-  Database,
-  FileCode,
-  LifeBuoy,
-  Plus,
-  Loader2,
-  RotateCcw,
-  AlertTriangle,
-  Clock,
-  Hash as HashIcon,
-} from "lucide-react";
-import VolumeManager from "@/components/volume-manager";
-import ServerMonitoring from "@/components/server-monitoring";
-import FirewallManager from "@/components/firewall-manager-enhanced";
-import { Separator } from "@/components/ui/separator";
-
-// Firewall Rule interface (simplified from the full interface in firewall-manager.tsx)
-// Schema for firewall disable confirmation
-// Using a regular string for the schema instead of literal
+// Form for disabling firewall with confirmation text - MOVED INSIDE COMPONENT
 const confirmFirewallDisableSchema = z.object({
   confirmationText: z
     .string()
@@ -358,7 +275,7 @@ const regionFlags = {
   sfo2: "🇺🇸 San Francisco 2",
   blr1: "🇮🇳 Bangalore 1",
   sfo3: "🇺🇸 San Francisco 3",
-  syd1: "🇦🇺 Sydney 1"
+  syd1: "🇦🇺 Sydney 1",
 };
 
 // Add function to get OS display name
@@ -387,6 +304,80 @@ export default function ServerDetailPage() {
     defaultValues: {
       confirmationText: "",
     },
+  });
+
+  // Add mutation for snapshot management
+  const createSnapshotMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/servers/${serverId}/snapshots`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Creating Snapshot",
+        description: "Your server snapshot is being created. This may take several minutes.",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/servers/${serverId}/snapshots`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create snapshot",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const restoreSnapshotMutation = useMutation({
+    mutationFn: async (snapshotId: string) => {
+      return await apiRequest("POST", `/api/servers/${serverId}/snapshots/${snapshotId}/restore`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Restoring Server",
+        description: "Your server is being restored from the snapshot. This may take several minutes.",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/servers/${serverId}`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to restore snapshot",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteSnapshotMutation = useMutation({
+    mutationFn: async (snapshotId: string) => {
+      return await apiRequest("DELETE", `/api/servers/${serverId}/snapshots/${snapshotId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Snapshot Deleted",
+        description: "The snapshot has been deleted successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/servers/${serverId}/snapshots`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete snapshot",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Add query to fetch snapshots
+  const { data: snapshots = [], isLoading: snapshotsLoading } = useQuery({
+    queryKey: [`/api/servers/${serverId}/snapshots`],
+    queryFn: async () => {
+      const response = await fetch(`/api/servers/${serverId}/snapshots`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch snapshots");
+      }
+      return response.json();
+    },
+    enabled: !isNaN(serverId) && !!user && !!server,
   });
 
   // Debug info
@@ -683,6 +674,8 @@ export default function ServerDetailPage() {
         </Button>
         <h1 className="text-3xl font-bold">{server.name}</h1>
         {/* Simple VPS status badge */}
+
+
         <Badge
           variant={server.status === "active" ? "default" : "secondary"}
           className={server.status === "restoring" ? "animate-pulse" : ""}
@@ -877,6 +870,87 @@ export default function ServerDetailPage() {
                       </p>
                     </div>
                     {/* Manage Volumes button removed as requested */}
+                  </div>
+                </div>
+                <Separator className="my-4" />
+
+                {/* Snapshot Management */}
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Snapshots</h3>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p>{snapshots.length} Snapshot{snapshots.length !== 1 ? 's' : ''} Available</p>
+                        <p className="text-xs text-muted-foreground">Snapshots are complete images of your server</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => createSnapshotMutation.mutate()}
+                        disabled={createSnapshotMutation.isPending || server.status !== 'active'}
+                      >
+                        <CopyPlus className="h-4 w-4 mr-2" />
+                        Create Snapshot
+                      </Button>
+                    </div>
+
+                    {snapshotsLoading ? (
+                      <div className="flex justify-center p-4">
+                        <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                        <span className="text-sm">Loading snapshots...</span>
+                      </div>
+                    ) : snapshots.length > 0 ? (
+                      <div className="space-y-2">
+                        {snapshots.map((snapshot: any) => (
+                          <div key={snapshot.id} className="flex justify-between items-center p-2 bg-muted rounded-md">
+                            <div>
+                              <p className="text-sm font-medium">{snapshot.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Created {new Date(snapshot.created_at).toLocaleString()}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm("Are you sure you want to restore this snapshot? Your server will be restarted.")) {
+                                    restoreSnapshotMutation.mutate(snapshot.id);
+                                  }
+                                }}
+                                disabled={restoreSnapshotMutation.isPending}
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive"
+                                onClick={() => {
+                                  if (confirm("Are you sure you want to delete this snapshot?")) {
+                                    deleteSnapshotMutation.mutate(snapshot.id);
+                                  }
+                                }}
+                                disabled={deleteSnapshotMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-muted p-4 rounded-md text-center">
+                        <p className="text-sm text-muted-foreground">No snapshots available</p>
+                      </div>
+                    )}
+
+                    {server.status !== 'active' && (
+                      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3 text-sm">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 inline mr-2" />
+                        Server must be powered on to create snapshots
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
