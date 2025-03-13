@@ -44,20 +44,19 @@ export default function ApiDocsPage() {
     responseSample: string;
   }) => {
     const baseUrl = import.meta.env.DEV
-      ? "http://skyvps360.com"
+      ? "https://skyvps360.xyz"
       : window.location.origin;
     const fullEndpoint = `${baseUrl}${endpoint}`;
     const isCopied = copiedEndpoint === endpoint;
 
     const requestCode = requestSample
       ? `curl -X ${method} ${fullEndpoint} \\
--H "X-API-Key: YOUR_API_KEY"${
-          requestSample
-            ? ` \\
+-H "X-API-Key: YOUR_API_KEY"${requestSample
+        ? ` \\
 -H "Content-Type: application/json" \\
 -d '${requestSample}'`
-            : ""
-        }`
+        : ""
+      }`
       : `curl -X ${method} ${fullEndpoint} \\
 -H "X-API-Key: YOUR_API_KEY"`;
 
@@ -210,7 +209,7 @@ export default function ApiDocsPage() {
                 </p>
                 <pre className="bg-muted p-4 rounded-md overflow-x-auto text-xs">
                   <code>
-                    {`curl -X GET ${import.meta.env.DEV ? "http://skynet360.com" : window.location.origin}/api/servers \\
+                    {`curl -X GET ${import.meta.env.DEV ? "https://skyvps360.xyz" : window.location.origin}/api/servers \\
 -H "X-API-Key: YOUR_API_KEY"`}
                   </code>
                 </pre>

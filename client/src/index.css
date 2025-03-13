@@ -55,75 +55,97 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
-  
+
   /* Fix for currency display */
-  .text-red-600, .text-green-600 {
+  .text-red-600,
+  .text-green-600 {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
     letter-spacing: -0.01em;
   }
 }
 
+/* Fix button a tags with icons */
+button a {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  justify-content: center;
+}
+
 /* Print styles for documentation */
 @media print {
+
   /* Hide navigation and unnecessary UI elements */
-  nav, header, footer, .sidebar, 
-  [role="tablist"], [role="tab"], 
+  nav,
+  header,
+  footer,
+  .sidebar,
+  [role="tablist"],
+  [role="tab"],
   input[type="search"],
   .print-hidden {
     display: none !important;
   }
-  
+
   /* Remove the print button */
   button[onClick*="print"] {
     display: none !important;
   }
-  
+
   /* Ensure proper color contrast for printing */
   body {
     color: black !important;
     background: white !important;
   }
-  
+
   /* Full width for content */
   .md\:col-span-3 {
     display: none !important;
   }
-  
+
   .md\:col-span-9 {
     width: 100% !important;
     max-width: 100% !important;
     grid-column: span 12 / span 12 !important;
   }
-  
+
   /* Remove card styling for cleaner print */
   .card {
     box-shadow: none !important;
     border: none !important;
   }
-  
+
   .card-content {
     padding: 0 !important;
     margin: 0 !important;
   }
-  
+
   /* Improve text rendering for print */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     page-break-after: avoid;
     break-after: avoid;
   }
-  
-  pre, code {
+
+  pre,
+  code {
     white-space: pre-wrap !important;
     word-wrap: break-word !important;
   }
-  
+
   /* Ensure proper page breaks */
-  p, h2, h3 {
+  p,
+  h2,
+  h3 {
     orphans: 3;
     widows: 3;
   }
-  
+
   /* Ensure code blocks print properly with borders */
   pre {
     border: 1px solid #ddd !important;
